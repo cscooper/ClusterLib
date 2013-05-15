@@ -1,0 +1,39 @@
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+// 
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program.  If not, see http://www.gnu.org/licenses/.
+// 
+
+package clusterlib;
+
+import org.mixim.base.modules.*;
+
+//
+// This module implements the clustering mechanism for
+// Modified Distributed Mobility-Aware Clustering (M-DMAC).
+// There is a pure virtual function that must be implemented by
+// inheriting cluster modules, which provides the weighting function
+// for the particular cluster algorithm being tested.
+//
+simple ClusterNetworkLayer extends BaseNetwLayer
+{
+   	parameters:
+        @class(ClusterNetworkLayer);
+
+    	double initialFreshness @unit(s) = default(20s);
+    	double freshnessThreshold @unit(s) = default(20s);
+    	double angleThreshold = default(0.5);
+    	int hopCount = default(1);
+    	double beaconInterval @unit(s) = default(20s);
+
+}
+
