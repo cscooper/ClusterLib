@@ -24,6 +24,9 @@
 #include <set>
 #include <map>
 
+
+#define BEAT_LENGTH	0.25	// measured in second.
+
 /**
  * This module implements the clustering mechanism for
  * Modified Distributed Mobility-Aware Clustering (M-DMAC).
@@ -55,7 +58,7 @@ protected:
 		Coord mPosition;					/**< Position of the Neighbour. */
 		Coord mVelocity;					/**< Velocity of the Neighbour. */
 		bool mIsClusterHead;				/**< Is this node a CH? */
-		double mFreshness;					/**< How long this node will stay in range of this neighbour. */
+		unsigned int mFreshness;			/**< How long this node will stay in range of this neighbour. Measured in beats. */
 	};
 
 	typedef std::set<unsigned int> NodeIdSet;
@@ -82,6 +85,7 @@ protected:
 
 	cMessage *mFirstInitMessage;			/**< Run the cluster init function for the first time. */
 	cMessage *mSendHelloMessage;			/**< Send a HELLO message. */
+	cMessage *mBeatMessage;					/**< Process the neighbour table for out-of-date node entries. */
 
     /*@}*/
 
@@ -95,8 +99,8 @@ protected:
      **/
     /*@{*/
 
-	double mInitialFreshness;				/**< The initial node freshness. */
-	double mFreshnessThreshold;				/**< The minimum freshness for which a node is eligible to be a CH. */
+	unsigned int mInitialFreshness;			/**< The initial node freshness (measured in beats). */
+	unsigned int mFreshnessThreshold;		/**< The minimum freshness for which a node is eligible to be a CH. */
 	double mAngleThreshold;					/**< The maximum angle between the directions of this node and another node for it to be considered for CH. */
 	unsigned int mHopCount;					/**< The number of hops for cluster control messages. */
 	double mBeaconInterval;					/**< The interval between each HELLO message. */
@@ -144,6 +148,9 @@ protected:
 
     /** @brief Initiate clustering. */
     void init();
+
+    /** @brief Process the neighbour table in one beat. Also, update the node's weight. */
+    void processBeat();
 
     /** @brief Select a CH from the neighbour table. */
     int chooseClusterHead();

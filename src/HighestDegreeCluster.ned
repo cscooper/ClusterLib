@@ -15,25 +15,12 @@
 
 package clusterlib;
 
-import org.mixim.base.modules.*;
-
 //
-// This module implements the clustering mechanism for
-// Modified Distributed Mobility-Aware Clustering (M-DMAC).
-// There is a pure virtual function that must be implemented by
-// inheriting cluster modules, which provides the weighting function
-// for the particular cluster algorithm being tested.
+// Implements the Highest Degree Clustering mechanism.
+// The degree is the number of nodes with which this node has a connection.
 //
-simple ClusterNetworkLayer extends BaseNetwLayer
+simple HighestDegreeCluster extends ClusterNetworkLayer
 {
-   	parameters:
-        @class(ClusterNetworkLayer);
-
-    	int initialFreshness = default(10);
-    	int freshnessThreshold = default(4);
-    	double angleThreshold = default(0.25);	// multiple of PI
-    	int hopCount = default(1);
-    	double beaconInterval @unit(s) = default(20s);
-
+    parameters:
+        @class(HighestDegreeCluster);
 }
-

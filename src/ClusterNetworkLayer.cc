@@ -51,9 +51,9 @@ void ClusterNetworkLayer::initialize(int stage)
     	mTransmitRangeSq = pow( channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance(), 2 );
 
     	// load configurations
-    	mInitialFreshness = par("initialFreshness").doubleValue();
-    	mFreshnessThreshold = par("freshnessThreshold").doubleValue();
-    	mAngleThreshold = par("angleThreshold").doubleValue();
+    	mInitialFreshness = par("initialFreshness").longValue();
+    	mFreshnessThreshold = par("freshnessThreshold").longValue();
+    	mAngleThreshold = par("angleThreshold").doubleValue() * M_PI;
     	mHopCount = par("hopCount").longValue();
     	mBeaconInterval = par("beaconInterval").doubleValue();
 
@@ -62,6 +62,8 @@ void ClusterNetworkLayer::initialize(int stage)
     	scheduleAt( simTime() + mBeaconInterval, mSendHelloMessage );
     	mFirstInitMessage = new cMessage();
     	scheduleAt( simTime(), mSendHelloMessage );
+    	mBeatMessage = new cMessage();
+    	scheduleAt( simTime() + BEAT_LENGTH, mBeatMessage );
 
     }
 
@@ -115,6 +117,11 @@ void ClusterNetworkLayer::handleSelfMsg(cMessage* msg) {
 
 		init();
 		delete mFirstInitMessage;
+
+	} else if ( msg == mBeatMessage ) {
+
+		processBeat();
+		scheduleAt( simTime() + BEAT_LENGTH, mBeatMessage );
 
 	}
 
@@ -220,6 +227,29 @@ void ClusterNetworkLayer::init() {
 
 
 
+/** @brief Process the neighbour table in one beat. Also, update the node's weight. */
+void ClusterNetworkLayer::processBeat() {
+
+	// process the neighbour table
+	NeighbourSet::iterator it = mNeighbours.begin();
+	for ( ; it != mNeighbours.end(); it++ ) {
+
+		it->second.mFreshness -= 1;
+		if ( it->second.mFreshness == 0 ) {
+
+			linkFailure( it->first );
+
+		}
+
+	}
+
+	// update the node's weight
+	mWeight = calculateWeight();
+
+}
+
+
+
 /** @brief Select a CH from the neighbour table. */
 int ClusterNetworkLayer::chooseClusterHead() {
 
@@ -260,7 +290,7 @@ void ClusterNetworkLayer::linkFailure( unsigned int nodeId ) {
 /** @brief Calculate the freshness of the given neighbour. */
 void ClusterNetworkLayer::calculateFreshness( unsigned int nodeId ) {
 
-	double freshness = mInitialFreshness;
+	unsigned int freshness = mInitialFreshness;
 	Coord v =    mMobility->getCurrentSpeed() - mNeighbours[ nodeId ].mVelocity;
 	Coord p = mMobility->getCurrentPosition() - mNeighbours[ nodeId ].mPosition;
 
@@ -274,8 +304,8 @@ void ClusterNetworkLayer::calculateFreshness( unsigned int nodeId ) {
 
 		if ( detSq > 0 ) {
 
-			double r1 = -b + sqrt( detSq );
-			double r2 = -b - sqrt( detSq );
+			unsigned int r1 = (int)floor( ( -b + sqrt( detSq ) ) / BEAT_LENGTH );
+			unsigned int r2 = (int)floor( ( -b - sqrt( detSq ) ) / BEAT_LENGTH );
 			if ( r1 > 0 && r2 > 0 )
 				freshness = std::min( 3*mInitialFreshness, std::min( r1, r2 ) );
 			else if ( r1 > 0 )
