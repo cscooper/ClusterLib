@@ -15,7 +15,7 @@
 
 package clusterlib;
 
-import org.mixim.base.modules.*;
+import org.mixim.base.modules.BaseNetwLayer;
 
 //
 // This module implements the clustering mechanism for

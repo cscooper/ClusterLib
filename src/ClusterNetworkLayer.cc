@@ -61,7 +61,7 @@ void ClusterNetworkLayer::initialize(int stage)
     	mSendHelloMessage = new cMessage();
     	scheduleAt( simTime() + mBeaconInterval, mSendHelloMessage );
     	mFirstInitMessage = new cMessage();
-    	scheduleAt( simTime(), mSendHelloMessage );
+    	scheduleAt( simTime(), mFirstInitMessage );
     	mBeatMessage = new cMessage();
     	scheduleAt( simTime() + BEAT_LENGTH, mBeatMessage );
 

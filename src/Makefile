@@ -31,7 +31,7 @@ PROJECTRELATIVE_PATH = src
 O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
-OBJS = $O/HighestDegreeCluster.o $O/ClusterNetworkLayer.o $O/ClusterControlMessage_m.o
+OBJS = $O/HighestDegreeCluster.o $O/ClusterNetworkLayer.o $O/LowestIdCluster.o $O/ClusterControlMessage_m.o
 
 # Message files
 MSGFILES = \
@@ -159,6 +159,37 @@ $O/HighestDegreeCluster.o: HighestDegreeCluster.cc \
 	ClusterControlMessage_m.h \
 	ClusterNetworkLayer.h \
 	HighestDegreeCluster.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
+	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/AddressingInterface.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/ArpInterface.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMacLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseNetwLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/phyLayer/Interpolation.h \
+	$(VEINS_2_0_PROJ)/src/base/phyLayer/MappingBase.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FindModule.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/NetwControlInfo.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/NetwToMacControlInfo.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/LowestIdCluster.o: LowestIdCluster.cc \
+	ClusterControlMessage_m.h \
+	ClusterNetworkLayer.h \
+	LowestIdCluster.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \

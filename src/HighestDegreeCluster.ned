@@ -23,4 +23,5 @@ simple HighestDegreeCluster extends ClusterNetworkLayer
 {
     parameters:
         @class(HighestDegreeCluster);
+
 }
