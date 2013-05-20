@@ -65,6 +65,12 @@ void ClusterNetworkLayer::initialize(int stage)
     	mBeatMessage = new cMessage();
     	scheduleAt( simTime() + BEAT_LENGTH, mBeatMessage );
 
+    	// set up result connection
+    	mSigOverhead = registerSignal( "sigOverhead" );
+    	mSigClusterLifetime = registerSignal( "sigClusterLifetime" );
+    	mSigClusterSize = registerSignal( "sigClusterSize" );
+    	mSigHeadChange = registerSignal( "sigHeadChange" );
+
     }
 
 }
@@ -152,7 +158,7 @@ NetwPkt* ClusterNetworkLayer::encapsMsg( cPacket *appPkt ) {
 
     ClusterControlMessage *pkt = new ClusterControlMessage(appPkt->getName(), DATA);
 
-    pkt->setBitLength(headerLength);
+    pkt->setBitLength(headerLength);	// ordinary IP packet
 
     cObject* cInfo = appPkt->removeControlInfo();
 
@@ -212,6 +218,7 @@ void ClusterNetworkLayer::init() {
 		mClusterHead = mID;
 		mClusterMembers.clear();
 		mClusterMembers.insert( mID );
+		mClusterStartTime = simTime();
 
 	} else {
 
@@ -278,10 +285,36 @@ int ClusterNetworkLayer::chooseClusterHead() {
 void ClusterNetworkLayer::linkFailure( unsigned int nodeId ) {
 
 	mNeighbours.erase( nodeId );
-	if ( mIsClusterHead )
+	if ( mIsClusterHead ) {
+
+		/*
+		 *  A member of this cluster is out of range, so erase it's ID
+		 *  and emit the cluster size change signal.
+		 */
 		mClusterMembers.erase( nodeId );
-	else if ( nodeId == mClusterHead )
+		emit( mSigClusterSize, mClusterMembers.size() );
+
+		// also check if we've lost all our CMs
+		if ( mClusterMembers.size() == 1 ) {
+
+			/*
+			 * We've lost all our CMs, so this cluster counts as dead.
+			 * Calculate it's lifetime and log it.
+			 */
+			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+			mClusterStartTime = 0;
+
+		}
+
+	} else if ( nodeId == mClusterHead ) {
+
+		/*
+		 *	This CM lost its CH, so recluster and emit the CH change signal.
+		 */
 		init();
+		emit( mSigHeadChange, 1 );
+
+	}
 
 }
 
@@ -349,8 +382,23 @@ void ClusterNetworkLayer::receiveHelloMessage( ClusterControlMessage *m ) {
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
 		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
+
+		// If this was a CH, the cluster is dead, so log lifetime
+		if ( mIsClusterHead ) {
+
+			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+			mClusterStartTime = 0;
+
+		} else if ( mClusterHead != -1 ) {
+
+			// we just changed clusterhead.
+			emit( mSigHeadChange, 1 );
+
+		}
+
 		mIsClusterHead = false;
 		mClusterMembers.clear();
+		mClusterHead = m->getNodeId();
 
 	}
 
@@ -371,8 +419,23 @@ void ClusterNetworkLayer::receiveChMessage( ClusterControlMessage *m ) {
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
 		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
+
+		// If this was a CH, the cluster is dead, so log lifetime
+		if ( mIsClusterHead ) {
+
+			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+			mClusterStartTime = 0;
+
+		} else if ( mClusterHead != -1 ) {
+
+			// we just changed clusterhead.
+			emit( mSigHeadChange, 1 );
+
+		}
+
 		mIsClusterHead = false;
 		mClusterMembers.clear();
+		mClusterHead = m->getNodeId();
 
 	}
 
@@ -392,14 +455,26 @@ void ClusterNetworkLayer::receiveJoinMessage( ClusterControlMessage *m ) {
 
 	if ( mIsClusterHead ) {
 
-		if ( m->getTargetNodeId() == mID )
+		bool sizeChanged = false;
+		if ( m->getTargetNodeId() == mID ) {
+
 			mClusterMembers.insert( m->getNodeId() );
-		else
+			sizeChanged = true;
+
+		} else if ( mClusterMembers.find( m->getNodeId() ) != mClusterMembers.end() ) {
+
 			mClusterMembers.erase( m->getNodeId() );
+			sizeChanged = true;
+
+		}
+
+		if ( sizeChanged )
+			emit( mSigClusterSize, mClusterMembers.size() );
 
 	} else if ( mClusterHead == m->getNodeId() ) {
 
 		init();
+		emit( mSigHeadChange, 1 );
 
 	}
 
@@ -433,7 +508,7 @@ void ClusterNetworkLayer::sendClusterMessage( int kind, int dest, int nHops ) {
     coreEV <<"sending cluster control message...\n";
 
 	ClusterControlMessage *pkt = new ClusterControlMessage( "cluster-ctrl", kind );
-    pkt->setBitLength(headerLength);
+    pkt->setBitLength(432);	// size of the control packet packet.
 
     // fill the cluster control fields
     pkt->setNodeId( mID );

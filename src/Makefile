@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for libClusterLib
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep --make-so -I/home/craig/Documents/PhD/simulations/ClusterLib/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L/home/craig/Documents/PhD/simulations/ClusterLib/URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
+#  opp_makemake -f --deep --make-so -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
 #
 
 # Name of target to be created (-o option)
@@ -10,7 +10,6 @@ TARGET = libClusterLib$(SHARED_LIB_SUFFIX)
 
 # C++ include paths (with -I)
 INCLUDE_PATH = \
-    -I../URAE/include \
     -I../../veins-2.0/src/base/utils \
     -I../../veins-2.0/src/base/phyLayer \
     -I../../veins-2.0/src/base/connectionManager \
@@ -22,8 +21,8 @@ INCLUDE_PATH = \
 EXTRA_OBJS =
 
 # Additional libraries (-L, -l options)
-LIBS = -L../URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base  -lmiximtestUtils -lmiximmodules -lmiximbase
-LIBS += -Wl,-rpath,`abspath ../URAE/lib` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/modules` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/base`
+LIBS = -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base  -lmiximtestUtils -lmiximmodules -lmiximbase
+LIBS += -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/modules` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/base`
 
 # Output directory
 PROJECT_OUTPUT_DIR = ../out

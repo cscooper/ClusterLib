@@ -35,5 +35,17 @@ simple ClusterNetworkLayer extends BaseNetwLayer
     	int hopCount = default(1);
     	double beaconInterval @unit(s) = default(20s);
 
+		// signals
+		@signal[sigOverhead](type="int");
+		@signal[sigClusterLifetime](type="double");
+		@signal[sigClusterSize](type="int");
+		@signal[sigHeadChanges](type="int");
+
+		// statistics
+		@statistic[       overhead]( source =             sigOverhead; record =      stats; title = "Overhead per node"; unit = "bytes" );
+		@statistic[clusterLifetime]( source =      sigClusterLifetime; record =      stats; title =  "Cluster Lifetime"; unit =     "s" );
+		@statistic[    clusterSize]( source =          sigClusterSize; record =     vector; title =      "Cluster Size"; 				);
+		@statistic[    headChanges]( source = "count(sigHeadChanges)"; record = last,stats; title =        "CH changes"; 				);
+
 }
 

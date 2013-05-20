@@ -71,6 +71,7 @@ protected:
 	bool mIsClusterHead;					/**< Is this node a CH? */
 	NodeIdSet mClusterMembers;				/**< Set of CMs associated with this node (if it is a CH) */
 	NeighbourSet mNeighbours;				/**< The set of neighbours near this node. */
+	simtime_t mClusterStartTime;			/**< The time at which this node last became a CH. */
 
 	double mTransmitRangeSq;				/**< Required for the freshness calculation. Obtained from the PhyLayer module. */
 
@@ -106,6 +107,41 @@ protected:
 	double mBeaconInterval;					/**< The interval between each HELLO message. */
 
     /*@}*/
+
+
+    /**
+     * @name Results
+     * @brief Results to be recorded.
+     *
+     * These members record the performance of the algorithm.
+     * The following performance metrics are recorded:
+     * 		1. Overhead per node:
+     * 		   This is the amount of traffic dedicated to cluster control,
+     * 		   measured as total bytes transmitted.
+     * 		   Type: Scalar
+     * 		2. Cluster Lifetime:
+     * 		   A cluster's life begins when a node becomes a CH and obtains
+     * 		   its first CM. It dies either when the CH becomes a CM of another
+     * 		   cluster, or the CH loses all its members. The lifetime is the
+     * 		   time, in seconds, between each of these events.
+     * 		   Type: Scalar
+     *		3. Cluster Size:
+     *		   Larger clusters mean more stability and lighter load on RSU
+     *		   Backbone.
+     *		   Type: Scalar
+     *		4. CH changes per node:
+     *		   How often do CMs change CH?
+     *		   Type: Scalar
+     *
+     **/
+    /*@{*/
+
+	simsignal_t mSigOverhead;			/**< Overhead per node. */
+	simsignal_t mSigClusterLifetime;	/**< Lifetime of a cluster for which this node is CH. */
+	simsignal_t mSigClusterSize;		/**< Size of the cluster for which this node is CH. */
+	simsignal_t mSigHeadChange;			/**< Changes in CH for this node. */
+
+	/*@}*/
 
 
 public:
