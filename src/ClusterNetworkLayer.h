@@ -51,8 +51,6 @@ public:
 	};
 
 
-protected:
-
 	struct Neighbour {
 		double mWeight;						/**< Weight of this node. */
 		Coord mPosition;					/**< Position of the Neighbour. */
@@ -61,8 +59,11 @@ protected:
 		unsigned int mFreshness;			/**< How long this node will stay in range of this neighbour. Measured in beats. */
 	};
 
+protected:
+
 	typedef std::set<unsigned int> NodeIdSet;
 	typedef std::map<unsigned int,Neighbour> NeighbourSet;
+	typedef std::map<unsigned int,Neighbour>::iterator NeighbourIterator;
 
 	unsigned int mID;						/**< Node's unique ID. */
 	double mWeight;							/**< Weight of this node. */
@@ -151,6 +152,9 @@ public:
 
     /** @brief Initialization of the module and some variables*/
     virtual void initialize(int);
+
+    /** @brief Cleanup*/
+    virtual void finish();
 
 protected:
 

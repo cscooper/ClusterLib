@@ -39,13 +39,13 @@ simple ClusterNetworkLayer extends BaseNetwLayer
 		@signal[sigOverhead](type="int");
 		@signal[sigClusterLifetime](type="double");
 		@signal[sigClusterSize](type="int");
-		@signal[sigHeadChanges](type="int");
+		@signal[sigHeadChange](type="int");
 
 		// statistics
-		@statistic[       overhead]( source =             sigOverhead; record =      stats; title = "Overhead per node"; unit = "bytes" );
-		@statistic[clusterLifetime]( source =      sigClusterLifetime; record =      stats; title =  "Cluster Lifetime"; unit =     "s" );
-		@statistic[    clusterSize]( source =          sigClusterSize; record =     vector; title =      "Cluster Size"; 				);
-		@statistic[    headChanges]( source = "count(sigHeadChanges)"; record = last,stats; title =        "CH changes"; 				);
+		@statistic[       overhead]( source =            sigOverhead; record =      stats; title = "Overhead per node"; unit = "bytes" );
+		@statistic[clusterLifetime]( source =     sigClusterLifetime; record =      stats; title =  "Cluster Lifetime"; unit =     "s" );
+		@statistic[    clusterSize]( source =         sigClusterSize; record =     vector; title =      "Cluster Size"; 			   );
+		@statistic[     headChange]( source = "count(sigHeadChange)"; record = last,stats; title =        "CH changes"; 			   );
 
 }
 

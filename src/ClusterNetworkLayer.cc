@@ -33,6 +33,12 @@
 
 Define_Module(ClusterNetworkLayer);
 
+std::ostream& operator<<( std::ostream& os, const ClusterNetworkLayer::Neighbour& n ) {
+
+	os << "Weight = " << n.mWeight << "; Pos = " << n.mPosition << "; Vel = " << n.mVelocity << "; C" << ( n.mIsClusterHead ? "H" : "M" ) << "; freshness = " << n.mFreshness;
+	return os;
+
+}
 
 void ClusterNetworkLayer::initialize(int stage)
 {
@@ -71,10 +77,36 @@ void ClusterNetworkLayer::initialize(int stage)
     	mSigClusterSize = registerSignal( "sigClusterSize" );
     	mSigHeadChange = registerSignal( "sigHeadChange" );
 
+    	// set up watches
+    	WATCH_SET( mClusterMembers );
+    	WATCH_MAP( mNeighbours );
+    	WATCH( mWeight );
+    	WATCH( mClusterHead );
+
     }
 
 }
 
+
+/** @brief Cleanup*/
+void ClusterNetworkLayer::finish() {
+
+	if ( mSendHelloMessage->isScheduled() )
+		cancelEvent( mSendHelloMessage );
+	delete mSendHelloMessage;
+
+	if ( mFirstInitMessage && mFirstInitMessage->isScheduled() )
+		cancelEvent( mFirstInitMessage );
+	delete mFirstInitMessage;
+
+	if ( mBeatMessage->isScheduled() )
+		cancelEvent( mBeatMessage );
+	delete mBeatMessage;
+
+	//std::cerr << "Node " << mID << " deleted.\n";
+	BaseNetwLayer::finish();
+
+}
 
 
 
@@ -97,10 +129,21 @@ void ClusterNetworkLayer::handleLowerMsg(cMessage* msg) {
 
     switch( m->getKind() ) {
 
-		case HELLO_MESSAGE: receiveHelloMessage( m ); break;
-		case    CH_MESSAGE:    receiveChMessage( m ); break;
-		case  JOIN_MESSAGE:  receiveJoinMessage( m ); break;
-		case 		  DATA: sendUp( decapsMsg( m ) ); break;
+		case HELLO_MESSAGE:
+			receiveHelloMessage( m );
+			break;
+
+		case CH_MESSAGE:
+			receiveChMessage( m );
+			break;
+
+		case JOIN_MESSAGE:
+			receiveJoinMessage( m );
+			break;
+
+		case DATA:
+			sendUp( decapsMsg( m ) );
+			break;
 
 		default:
 		    coreEV << " received packet from " << m->getSrcAddr() << " of unknown type: " << m->getKind() << std::endl;
@@ -123,6 +166,7 @@ void ClusterNetworkLayer::handleSelfMsg(cMessage* msg) {
 
 		init();
 		delete mFirstInitMessage;
+		mFirstInitMessage = NULL;
 
 	} else if ( msg == mBeatMessage ) {
 
@@ -213,20 +257,20 @@ void ClusterNetworkLayer::init() {
 	if ( nMax == -1 ) {
 
 		// this node is the best CH around, so declare it
-		sendClusterMessage( CH_MESSAGE );
 		mIsClusterHead = true;
 		mClusterHead = mID;
 		mClusterMembers.clear();
 		mClusterMembers.insert( mID );
-		mClusterStartTime = simTime();
+		sendClusterMessage( CH_MESSAGE );
 
 	} else {
 
 		// we found a neighbour that's a better CH
-		sendClusterMessage( JOIN_MESSAGE, nMax );
 		mIsClusterHead = false;
 		mClusterHead = nMax;
 		mClusterMembers.clear();
+    	//std::cerr << "Node: " << mID << " joined CH!: " << nMax << "\n";
+		sendClusterMessage( JOIN_MESSAGE, nMax );
 
 	}
 
@@ -237,21 +281,27 @@ void ClusterNetworkLayer::init() {
 /** @brief Process the neighbour table in one beat. Also, update the node's weight. */
 void ClusterNetworkLayer::processBeat() {
 
+	// update the node's weight
+	mWeight = calculateWeight();
+
 	// process the neighbour table
-	NeighbourSet::iterator it = mNeighbours.begin();
-	for ( ; it != mNeighbours.end(); it++ ) {
+	NeighbourIterator it = mNeighbours.begin();
+	for ( ; it != mNeighbours.end(); ) {
 
 		it->second.mFreshness -= 1;
 		if ( it->second.mFreshness == 0 ) {
 
-			linkFailure( it->first );
+			unsigned int nodeId = it->first;
+			it++;
+			linkFailure( nodeId );
+
+		} else {
+
+			++it;
 
 		}
 
 	}
-
-	// update the node's weight
-	mWeight = calculateWeight();
 
 }
 
@@ -263,7 +313,7 @@ int ClusterNetworkLayer::chooseClusterHead() {
 	int nCurr = -1;
 	double wCurr = mWeight;
 
-	NeighbourSet::iterator it = mNeighbours.begin();
+	NeighbourIterator it = mNeighbours.begin();
 	for ( ; it != mNeighbours.end(); it++ ) {
 
 		if ( it->second.mIsClusterHead && it->second.mWeight > wCurr ) {
@@ -287,6 +337,9 @@ void ClusterNetworkLayer::linkFailure( unsigned int nodeId ) {
 	mNeighbours.erase( nodeId );
 	if ( mIsClusterHead ) {
 
+		if ( mClusterMembers.find( nodeId ) == mClusterMembers.end() )
+			return;		// we don't need to do anything, because it wasn't a member of our cluster.
+
 		/*
 		 *  A member of this cluster is out of range, so erase it's ID
 		 *  and emit the cluster size change signal.
@@ -303,6 +356,7 @@ void ClusterNetworkLayer::linkFailure( unsigned int nodeId ) {
 			 */
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 			mClusterStartTime = 0;
+	    	//std::cerr << "Cluster (CH: " << mID << ") has died of attrition!\n";
 
 		}
 
@@ -360,7 +414,7 @@ void ClusterNetworkLayer::calculateFreshness( unsigned int nodeId ) {
 bool ClusterNetworkLayer::testClusterHeadChange( unsigned int nodeId ) {
 
 	bool t1 = mNeighbours[nodeId].mIsClusterHead;
-	bool t2 = mNeighbours[nodeId].mWeight > mNeighbours[mClusterHead].mWeight;
+	bool t2 = mNeighbours[nodeId].mWeight > ( mIsClusterHead ? mWeight : mNeighbours[mClusterHead].mWeight );
 	bool t3 = mNeighbours[nodeId].mFreshness >= mFreshnessThreshold;
 
 	Coord v1 = mMobility->getCurrentSpeed();
@@ -381,24 +435,25 @@ void ClusterNetworkLayer::receiveHelloMessage( ClusterControlMessage *m ) {
 
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
-		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
-
 		// If this was a CH, the cluster is dead, so log lifetime
 		if ( mIsClusterHead ) {
 
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 			mClusterStartTime = 0;
+	    	//std::cerr << "Cluster (CH: " << mID << ") has died! " << mID << " joined CH" << m->getNodeId() << ". w("  << mID <<  ")=" << mWeight << "; w("  << m->getNodeId() <<  ")=" << m->getWeight() << "; \n";
 
-		} else if ( mClusterHead != -1 ) {
+		} else if ( mClusterHead != m->getNodeId() ) {
 
 			// we just changed clusterhead.
-			emit( mSigHeadChange, 1 );
+	    	//std::cerr << "Node: " << mID << " joined CH: " << m->getNodeId() << "\n";
 
 		}
 
+        emit( mSigHeadChange, 1 );
 		mIsClusterHead = false;
 		mClusterMembers.clear();
 		mClusterHead = m->getNodeId();
+		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
 
 	}
 
@@ -418,24 +473,39 @@ void ClusterNetworkLayer::receiveChMessage( ClusterControlMessage *m ) {
 
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
-		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
-
 		// If this was a CH, the cluster is dead, so log lifetime
 		if ( mIsClusterHead ) {
 
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 			mClusterStartTime = 0;
-
-		} else if ( mClusterHead != -1 ) {
-
-			// we just changed clusterhead.
-			emit( mSigHeadChange, 1 );
+	    	//std::cerr << "Cluster (CH: " << mID << ") has died! " << mID << " joined CH" << m->getNodeId() << ". w("  << mID <<  ")=" << mWeight << "; w("  << m->getNodeId() <<  ")=" << m->getWeight() << "; \n";
+            emit( mSigHeadChange, 1 );
 
 		}
 
+        emit( mSigHeadChange, 1 );
 		mIsClusterHead = false;
 		mClusterMembers.clear();
 		mClusterHead = m->getNodeId();
+		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
+
+	} else {
+
+		if ( mIsClusterHead ) {
+
+			bool sizeChanged = false;
+
+			if ( mClusterMembers.find( m->getNodeId() ) != mClusterMembers.end() ) {
+
+				mClusterMembers.erase( m->getNodeId() );
+				sizeChanged = true;
+
+			}
+
+			if ( sizeChanged )
+				emit( mSigClusterSize, mClusterMembers.size() );
+
+		}
 
 	}
 
@@ -460,11 +530,20 @@ void ClusterNetworkLayer::receiveJoinMessage( ClusterControlMessage *m ) {
 
 			mClusterMembers.insert( m->getNodeId() );
 			sizeChanged = true;
+			if ( mClusterMembers.size() == 2 ) {
+				mClusterStartTime = simTime();	// start of cluster lifetime.
+		        //std::cerr << "Node: " << mID << " has become a CH!\n";
+			}
 
 		} else if ( mClusterMembers.find( m->getNodeId() ) != mClusterMembers.end() ) {
 
 			mClusterMembers.erase( m->getNodeId() );
 			sizeChanged = true;
+			if ( mClusterMembers.size() == 1 ) {
+		    	//std::cerr << "Cluster (CH: " << mID << ") has died of attrition!\n";
+	            emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+	            mClusterStartTime = 0;
+			}
 
 		}
 
@@ -510,9 +589,13 @@ void ClusterNetworkLayer::sendClusterMessage( int kind, int dest, int nHops ) {
 	ClusterControlMessage *pkt = new ClusterControlMessage( "cluster-ctrl", kind );
     pkt->setBitLength(432);	// size of the control packet packet.
 
+    emit( mSigOverhead, 432 );
+
     // fill the cluster control fields
     pkt->setNodeId( mID );
     pkt->setWeight( mWeight );
+    if ( nHops == -1 )
+    	nHops = mHopCount;
     pkt->setTtl( nHops );
 
     Coord p = mMobility->getCurrentPosition();
