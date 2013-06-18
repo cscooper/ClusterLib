@@ -13,8 +13,8 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-#ifndef __CLUSTERLIB_HIGHESTDEGREECLUSTER_H_
-#define __CLUSTERLIB_HIGHESTDEGREECLUSTER_H_
+#ifndef __CLUSTERLIB_LSUFCLUSTER_H_
+#define __CLUSTERLIB_LSUFCLUSTER_H_
 
 #include <omnetpp.h>
 
@@ -28,15 +28,13 @@
 #include "ClusterNetworkLayer.h"
 
 /**
- * Implements the Highest Degree Clustering mechanism.
- * The degree is the number of nodes with which this node has a connection.
+ * Implements the Lane-Sense Utility Function (LSUF) Clustering metric.
  */
-class HighestDegreeCluster : public ClusterNetworkLayer {
-
-protected:
-    /** @brief Compute the CH weight for this node. */
-    double calculateWeight();
-
+class LSUFCluster : public ClusterNetworkLayer
+{
+  protected:
+	/** @brief Compute the CH weight for this node. */
+	double calculateWeight();
 };
 
 #endif

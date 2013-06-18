@@ -13,30 +13,32 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-#ifndef __CLUSTERLIB_HIGHESTDEGREECLUSTER_H_
-#define __CLUSTERLIB_HIGHESTDEGREECLUSTER_H_
 
-#include <omnetpp.h>
+#include "BaseNetwLayer.h"
 
-#include <MiXiMDefs.h>
-#include <BaseNetwLayer.h>
+#include <cassert>
 
-#include <set>
-#include <map>
-
+#include "NetwControlInfo.h"
+#include "BaseMacLayer.h"
+#include "AddressingInterface.h"
+#include "SimpleAddress.h"
+#include "FindModule.h"
 #include "ClusterControlMessage_m.h"
-#include "ClusterNetworkLayer.h"
+#include "ArpInterface.h"
+#include "NetwToMacControlInfo.h"
+#include "BaseMobility.h"
+#include "BaseConnectionManager.h"
+#include "ChannelAccess.h"
 
-/**
- * Implements the Highest Degree Clustering mechanism.
- * The degree is the number of nodes with which this node has a connection.
- */
-class HighestDegreeCluster : public ClusterNetworkLayer {
+#include "LowestIdCluster.h"
 
-protected:
-    /** @brief Compute the CH weight for this node. */
-    double calculateWeight();
+Define_Module(LowestIdCluster);
 
-};
 
-#endif
+/** @brief Compute the CH weight for this node. */
+double LowestIdCluster::calculateWeight() {
+
+	return -mID;
+
+}
+

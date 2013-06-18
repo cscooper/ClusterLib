@@ -21,6 +21,7 @@
 #include <MiXiMDefs.h>
 #include <BaseNetwLayer.h>
 
+#include <fstream>
 #include <set>
 #include <map>
 
@@ -120,30 +121,36 @@ protected:
      * 		   This is the amount of traffic dedicated to cluster control,
      * 		   measured as total bytes transmitted.
      * 		   Type: Scalar
-     * 		2. Cluster Lifetime:
+     * 		2. Overhead per node (HELLO messages only):
+     * 		   This is the amount of traffic dedicated HELLO messages,
+     * 		   measured as total bytes transmitted.
+     * 		   Type: Scalar
+     * 		3. Cluster Lifetime:
      * 		   A cluster's life begins when a node becomes a CH and obtains
      * 		   its first CM. It dies either when the CH becomes a CM of another
      * 		   cluster, or the CH loses all its members. The lifetime is the
      * 		   time, in seconds, between each of these events.
      * 		   Type: Scalar
-     *		3. Cluster Size:
+     *		4. Cluster Size:
      *		   Larger clusters mean more stability and lighter load on RSU
      *		   Backbone.
      *		   Type: Scalar
-     *		4. CH changes per node:
+     *		5. CH changes per node:
      *		   How often do CMs change CH?
      *		   Type: Scalar
      *
      **/
     /*@{*/
 
-	simsignal_t mSigOverhead;			/**< Overhead per node. */
+	simsignal_t mSigOverhead;			/**< Overhead per node (not including HELLO messages). */
+	simsignal_t mSigHelloOverhead;		/**< Overhead per node (HELLO messages only). */
 	simsignal_t mSigClusterLifetime;	/**< Lifetime of a cluster for which this node is CH. */
 	simsignal_t mSigClusterSize;		/**< Size of the cluster for which this node is CH. */
 	simsignal_t mSigHeadChange;			/**< Changes in CH for this node. */
 
-	/*@}*/
+	std::ofstream mClusterDeathOutput;	/**< The handle for the file where locations of cluster death will be logged. */
 
+	/*@}*/
 
 public:
     //Module_Class_Members(BaseNetwLayer,BaseLayer,0);

@@ -29,6 +29,8 @@
 #include "BaseConnectionManager.h"
 #include "ChannelAccess.h"
 
+#include "TraCIScenarioManager.h"
+
 #include "ClusterNetworkLayer.h"
 
 Define_Module(ClusterNetworkLayer);
@@ -73,6 +75,7 @@ void ClusterNetworkLayer::initialize(int stage)
 
     	// set up result connection
     	mSigOverhead = registerSignal( "sigOverhead" );
+    	mSigHelloOverhead = registerSignal( "sigHelloOverhead" );
     	mSigClusterLifetime = registerSignal( "sigClusterLifetime" );
     	mSigClusterSize = registerSignal( "sigClusterSize" );
     	mSigHeadChange = registerSignal( "sigHeadChange" );
@@ -82,6 +85,13 @@ void ClusterNetworkLayer::initialize(int stage)
     	WATCH_MAP( mNeighbours );
     	WATCH( mWeight );
     	WATCH( mClusterHead );
+
+//     	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
+//     	char strNodeName[50];
+//     	sprintf( strNodeName, "node%i_conn", mID );
+//     	std::list<Coord> points;
+//     	points.push_back( mMobility->getCurrentPosition() );
+//     	pManager->commandAddPolygon( strNodeName, "clusterConn", TraCIScenarioManager::Color( 255, 0, 0, 255 ), true, 5, points );
 
     }
 
@@ -102,6 +112,11 @@ void ClusterNetworkLayer::finish() {
 	if ( mBeatMessage->isScheduled() )
 		cancelEvent( mBeatMessage );
 	delete mBeatMessage;
+
+// 	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
+// 	char strNodeName[10];
+// 	sprintf( strNodeName, "node%i_conn", mID );
+// 	pManager->commandRemovePolygon( strNodeName, 5 );
 
 	//std::cerr << "Node " << mID << " deleted.\n";
 	BaseNetwLayer::finish();
@@ -303,6 +318,18 @@ void ClusterNetworkLayer::processBeat() {
 
 	}
 
+// 	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
+// 	char strNodeName[10];
+// 	sprintf( strNodeName, "node%i_conn", mID );
+// 
+// 	std::list<Coord> points;
+// 	points.push_back( mMobility->getCurrentPosition() );
+// 
+// 	if ( !mIsClusterHead )
+// 		points.push_back( mNeighbours[mClusterHead].mPosition );
+// 
+// 	pManager->commandSetPolygonShape( strNodeName, points );
+
 }
 
 
@@ -388,19 +415,11 @@ void ClusterNetworkLayer::calculateFreshness( unsigned int nodeId ) {
 		c = ( p.squareLength() - mTransmitRangeSq ) / a;
 
 		double detSq = b*b - c;
+		unsigned int r = UINT_MAX;
+		if ( detSq > 0 )
+			r = (int)floor( ( sqrt( detSq ) - b ) / BEAT_LENGTH );
 
-		if ( detSq > 0 ) {
-
-			unsigned int r1 = (int)floor( ( -b + sqrt( detSq ) ) / BEAT_LENGTH );
-			unsigned int r2 = (int)floor( ( -b - sqrt( detSq ) ) / BEAT_LENGTH );
-			if ( r1 > 0 && r2 > 0 )
-				freshness = std::min( 3*mInitialFreshness, std::min( r1, r2 ) );
-			else if ( r1 > 0 )
-				freshness = std::min( 3*mInitialFreshness, r1 );
-			else if ( r2 > 0 )
-				freshness = std::min( 3*mInitialFreshness, r2 );
-
-		}
+		freshness = std::min( 3*mInitialFreshness, r );
 
 	}
 
@@ -436,7 +455,7 @@ void ClusterNetworkLayer::receiveHelloMessage( ClusterControlMessage *m ) {
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
 		// If this was a CH, the cluster is dead, so log lifetime
-		if ( mIsClusterHead ) {
+		if ( mIsClusterHead && mClusterMembers.size() > 1 ) {
 
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 			mClusterStartTime = 0;
@@ -589,7 +608,10 @@ void ClusterNetworkLayer::sendClusterMessage( int kind, int dest, int nHops ) {
 	ClusterControlMessage *pkt = new ClusterControlMessage( "cluster-ctrl", kind );
     pkt->setBitLength(432);	// size of the control packet packet.
 
-    emit( mSigOverhead, 432 );
+    if ( kind != HELLO_MESSAGE )
+    	emit( mSigOverhead, 432 );
+    else
+    	emit( mSigHelloOverhead, 432 );
 
     // fill the cluster control fields
     pkt->setNodeId( mID );

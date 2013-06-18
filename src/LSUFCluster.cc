@@ -13,7 +13,6 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-
 #include "BaseNetwLayer.h"
 
 #include <cassert>
@@ -30,15 +29,22 @@
 #include "BaseConnectionManager.h"
 #include "ChannelAccess.h"
 
-#include "HighestDegreeCluster.h"
+#include "LSUFCluster.h"
 
-Define_Module(HighestDegreeCluster);
+Define_Module(LSUFCluster);
 
 
 /** @brief Compute the CH weight for this node. */
-double HighestDegreeCluster::calculateWeight() {
+double LSUFCluster::calculateWeight() {
 
-	return mNeighbours.size();
+	/*
+	 * Overview of LSUF:
+	 * This is based on Utility-Function clustering.
+	 * The metric is a weight computed from statistics of
+	 * node placement around the node computing its own weight,
+	 * as well as the lane it is in.
+	 */
+
+	return 0;
 
 }
-

@@ -13,30 +13,14 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-#ifndef __CLUSTERLIB_HIGHESTDEGREECLUSTER_H_
-#define __CLUSTERLIB_HIGHESTDEGREECLUSTER_H_
+package clusterlib;
 
-#include <omnetpp.h>
 
-#include <MiXiMDefs.h>
-#include <BaseNetwLayer.h>
-
-#include <set>
-#include <map>
-
-#include "ClusterControlMessage_m.h"
-#include "ClusterNetworkLayer.h"
-
-/**
- * Implements the Highest Degree Clustering mechanism.
- * The degree is the number of nodes with which this node has a connection.
- */
-class HighestDegreeCluster : public ClusterNetworkLayer {
-
-protected:
-    /** @brief Compute the CH weight for this node. */
-    double calculateWeight();
-
-};
-
-#endif
+//
+// Implements the Lowest ID Clustering mechanism.
+//
+simple LowestIdCluster extends ClusterNetworkLayer
+{
+    parameters:
+        @class(LowestIdCluster);
+}
