@@ -13,50 +13,69 @@ def ComputeWeights( options ):
 	# scan the edges in the net.
 	netEdges = netFile.getEdges()
 	for edge in netEdges:
-		# Create empty lane weight lookup
-		laneWeightLookup = {}
 		linkLookup = {}
 		flows = {}
+		flowLanePair = {}
 
-		# scan through all the outgoing connections
+		# Get a list of all outgoing connctions from this edge
 		conns = []
 		outgoingConnections = edge.getOutgoing()
 		for connection in outgoingConnections.iterkeys():
 			conns += outgoingConnections[connection]
 
+		# If there are no outgoing connections, skip this edge.
 		if len(conns) == 0:
 			continue
 
+		# Scan the connections in the list.
 		for connection in conns:
-			# get the name of the destination link
+			# Get the ID of the destination link
 			dest = connection._to._id
-			if dest not in laneWeightLookup:
-				laneWeightLookup[dest] = []
+
+			# Add this to the link look-up
+			if dest not in linkLookup:
 				linkLookup[dest] = connection._to
-				flows[dest] = [0,len(flows.keys())]
-			laneWeightLookup[dest].append( connection._fromLane.getID() )
-			flows[dest][0] += 1
+
+			# Add the source lane to the flow-lane lookup.
+			src = connection._fromLane.getID()
+			if src not in flowLanePair.keys():
+				flowLanePair[src] = []
+
+			# Add this flow to the set of flows to which this lane belongs.
+			flowLanePair[src].append(dest)
+
+		# Remove duplicate flow entries for each lane and count the number of lanes belonging to each flow.
+		for lane in flowLanePair.iterkeys():
+			flowLanePair[lane] = list( set( flowLanePair[lane] ) )
+			for dest in flowLanePair[lane]:
+				if dest not in flows.keys():
+					flows[dest] = [0,len(flows.keys())]
+				flows[dest][0] += 1
 
 		# We need to be able to determine whether a lane connection goes straight or turns.
-		# Thus we scan the keys in laneWeightLookup, working out whether the connection goes straight or turns.
+		# Thus we scan the keys in linkLookup, working out whether the connection goes straight or turns.
 		# The criteria is the angle between this link and the destination. This assumes that there are at most
 		# five lanes at any node. It sorts the links in order of angle, and selects the two with the highest
-		# angle as ones that turn (unless there are only two, in which case it selects the highest one).
+		# angle as ones that go straight (unless there are only two, in which case it selects the highest one).
 
 		# NOTE! This assumes that the source link's _to is equal to the _from of each destination link.
 
 		# Compute the vector of this edge
 		centrePoint = Vector2D( edge._to._coord[0], edge._to._coord[1] )
 		thisEdge = Vector2D( edge._from._coord[0], edge._from._coord[1] ) - centrePoint
+
+		# Calculate the angle to rotate each vector, such that the current edge vector is the positive y axis.
 		rotAngle = math.acos( thisEdge.y / thisEdge.Magnitude() )
 		if thisEdge.x != 0:
 			rotAngle *= thisEdge.x / abs( thisEdge.x )
+
+		# Now, calculate the angles between each outgoing edge and this edge.
 		connAngles = []
 		for link in linkLookup.keys():
 			# Compute the link's vector.
 			currLink = Vector2D( linkLookup[link]._to._coord[0], linkLookup[link]._to._coord[1] ) - centrePoint
 
-			# Determine what side of the y axis the vector lies on.
+			# Determine what side of the y axis the vector lies on. If rotX is -ive, the link is a left turn. +ive means a right turn.
 			rotX = currLink.x * math.cos( rotAngle ) - currLink.y * math.sin( rotAngle )
 			if rotX != 0:
 				rotX /= abs(rotX)
@@ -65,69 +84,59 @@ def ComputeWeights( options ):
 			connAngles.append( [ link, thisEdge.AngleBetween( currLink ), rotX ] )
 
 		# We have the connection angles. Sort in order of increasing angle.
-		# Then set all the 
-#		print connAngles
 		connAngles = sorted( connAngles, key=lambda p: p[1] )
+
+		# If there's only one connecting link, then just assume that it's going straight ahead. 
 		if len(connAngles) == 1:
 			connAngles[0][2] = 0
-		if len(connAngles) == 2:
+		# If there's only two connecting links, the one with the largest angle is going straight.
+		elif len(connAngles) == 2:
 			connAngles[1][2] = 0
+		# If there are more than two, the lowest two are going to turn, and the rest are straight.
 		elif len(connAngles) > 2:
-			for i in range(3,len(connAngles)):
+			for i in range(2,len(connAngles)):
 				connAngles[i][2] = 0
 
+		# Now that we've worked that out, construct a lookup linking the link name to whether it turns left, right, or goes straight.
 		angleLookup = {}
 		for a in connAngles:
 			angleLookup[a[0]] = a[2]
 
-		lanesProcessed = []
+		# Now for all the lanes in the edge, find the ones that belong to multiple flows. For each of these, ignore the flows
+		# that are not indicated as priority by 'options.prioritiseTurns'
+		for lane in flowLanePair.iterkeys():
+			if len(flowLanePair[lane]) == 1:
+				continue	# this lane is part of only one flow
 
-		for dest in laneWeightLookup.iterkeys():
-			for lane in laneWeightLookup[dest]:
-
-				# Check if we've already processed this lane.
-				if lane in lanesProcessed:
-					continue
-
-				# First check if this lane belongs to multiple traffic flows
-				currFlows = [dest]
-				for d in laneWeightLookup.iterkeys():
-					if d == dest:
-						continue
-					if lane in laneWeightLookup[d]:
-						currFlows.append( d )
-
-				if len( currFlows ) > 1:
-					# We have multiple flows.
-					# If the field 'options.prioritiseTurns' is not zero, then we go with the
-					# flow that will turn. If the lane can go straight, or turn left or right,
-					# the sign of 'options.prioritiseTurns' determines if the left turn (-1) is
-					# prioritised, or the right turn (+1).
-					if len( currFlows ) == 2:
-						for flow in currFlows:
-							if options.prioritiseTurns == 0:
-								if angleLookup[flow] == 0:
-									currFlows = flow
-									break
-							else:
-								if angleLookup[flow] != 0:
-									currFlows = flow
-									break
-
-					elif len( currFlows ) == 3:
-						for flow in currFlows:
-							if options.prioritiseTurns == angleLookup[flow]:
-								currFlows = flow
-								break
-
+			# If the lane is part of two flows, then it can either be straight or a turn.
+			# We treat it differently than whether there are more than two, since if we treated this case the same,
+			# any right turns without corresponding left turns would be pruned if options.prioritiseTurns = 'left'.
+			# Thus in the case of two flows, we treat any turns the same.
+			if len(flowLanePair[lane]) == 2:
+				if options.prioritiseTurns == 0:
+					keepers = [flow for flow in flowLanePair[lane] if angleLookup[flow] == 0]
 				else:
-					currFlows = currFlows[0]
+					keepers = [flow for flow in flowLanePair[lane] if angleLookup[flow] != 0]
+			# In the other case, we just need to make sure that the turn code is the type of turn we're prioritising.
+			else:
+				keepers = [flow for flow in flowLanePair[lane] if angleLookup[flow] == options.prioritiseTurns]
 
-				# Now we've determined the flow this lane belongs to, we compute the lane weight, and add it to the list of weights
-				laneWeights.append( [ lane, float(flows[dest][0])/edge.getLaneNumber(), flows[dest][1] ] )
+			# Prune the losers.
+			losers = [flow for flow in flowLanePair[lane] if flow not in keepers]
 
-				# Add this to the set of processed lanes.
-				lanesProcessed.append( lane )
+			# Keep the keepers.
+			flowLanePair[lane] = keepers
+
+			# Decrement the flow member count for each of the losers.
+			for flow in losers:
+				flows[flow][0] -= 1
+
+		# By now, all lanes should be associated with ONLY ONE FLOW!
+
+		for lane in flowLanePair.iterkeys():
+			# Now we've determined the flow this lane belongs to, we compute the lane weight, and add it to the list of weights
+			flow = flowLanePair[lane][0]
+			laneWeights.append( [ lane, float(flows[flow][0])/edge.getLaneNumber(), flows[flow][1] ] )
 
 	# Got all the weights.
 	# Now we save the data to a file.
