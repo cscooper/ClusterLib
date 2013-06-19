@@ -32,6 +32,8 @@ packet ClusterControlMessage extends NetwPkt {
 	double yPosition;
 	double xVelocity;
 	double yVelocity;
+	string roadId;
+	string laneId;
 	int targetNodeId;	// ID of the CH I wish to join (used for JOIN_MESSAGE type)
 
 }

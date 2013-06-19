@@ -22,4 +22,5 @@ simple LSUFCluster extends ClusterNetworkLayer
 {
     parameters:
         @class(LSUFCluster);
+        string laneWeightFile;
 }

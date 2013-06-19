@@ -27,12 +27,24 @@
 #include "ClusterControlMessage_m.h"
 #include "ClusterNetworkLayer.h"
 
+#include "LSUFData.h"
+
 /**
  * Implements the Lane-Sense Utility Function (LSUF) Clustering metric.
  */
 class LSUFCluster : public ClusterNetworkLayer
 {
-  protected:
+public:
+    /** @brief Initialization of the module and some variables*/
+    void initialize(int);
+
+    /** @brief Cleanup*/
+    void finish();
+
+protected:
+
+    static LSUFData *mLaneWeightData;
+
 	/** @brief Compute the CH weight for this node. */
 	double calculateWeight();
 };

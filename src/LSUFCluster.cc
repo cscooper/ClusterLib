@@ -31,7 +31,49 @@
 
 #include "LSUFCluster.h"
 
+
 Define_Module(LSUFCluster);
+
+LSUFData *LSUFCluster::mLaneWeightData = NULL;
+
+
+/** @brief Initialization of the module and some variables*/
+void LSUFCluster::initialize( int stage ) {
+
+    if ( stage == 0 ) {
+
+        if ( LSUFCluster::mLaneWeightData == NULL ) {
+        	try {
+        		LSUFCluster::mLaneWeightData = new LSUFData( par("laneWeightFile").stringValue() );
+        	} catch( const char *e ) {
+        		opp_error( e );
+        	}
+        }
+
+        LSUFCluster::mLaneWeightData->addRef();
+
+    }
+
+    ClusterNetworkLayer::initialize( stage );
+
+}
+
+/** @brief Cleanup*/
+void LSUFCluster::finish() {
+
+    if ( LSUFCluster::mLaneWeightData != NULL ) {
+
+        LSUFCluster::mLaneWeightData->release();
+        if ( LSUFCluster::mLaneWeightData->getReferenceCount() == 0 ) {
+            delete LSUFCluster::mLaneWeightData;
+            LSUFCluster::mLaneWeightData = NULL;
+        }
+
+    }
+
+    ClusterNetworkLayer::finish();
+
+}
 
 
 /** @brief Compute the CH weight for this node. */
@@ -45,6 +87,63 @@ double LSUFCluster::calculateWeight() {
 	 * as well as the lane it is in.
 	 */
 
-	return 0;
+	// If the module hasn't been initialised yet, return zero.
+	if ( !mInitialised )
+		return 0;
+
+	// Fetch the weight of this lane, and it's flow ID
+	float laneWeight;
+	unsigned char flow;
+	if ( !LSUFCluster::mLaneWeightData->getLaneWeight( mRoadID+"_"+mLaneID, &laneWeight, &flow ) )
+		opp_error( "Tried to get weight for an unknown lane '%s' for current node #%d", (mRoadID+"_"+mLaneID).c_str(), mID );
+
+	/*
+	 * Now that we have the weight, we have to iterate through the neighbour table.
+	 * We calculate the Network Connectivity Level, the Average Distance Level,
+	 * and Average Velocity Level.
+	 */
+	int alpha = mNeighbours.size();
+	int beta = 0;
+	float delta = 0, chi = 0, sigma = 0, rho = 0;
+	for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ ) {
+
+		// This check does not appear to be part of the original algorithm.
+		if( it->second.mRoadID != mRoadID )
+			continue;	// We don't want to cluster with cars that are not on the same road as us.
+
+		// Calculate distance and difference in velocity
+		float dist, dv;
+		dist = mMobility->getCurrentPosition().distance( it->second.mPosition );
+		dv = mMobility->getCurrentSpeed().distance( it->second.mVelocity );
+
+		delta += dist;
+		sigma += dv;
+
+		// Get the flow ID of this neighbour.
+		unsigned char currFlow;
+		if ( !LSUFCluster::mLaneWeightData->getLaneWeight( it->second.mRoadID+"_"+it->second.mLaneID, NULL, &currFlow ) )
+			opp_error( "Tried to get weight for an unknown lane '%s' for current node #%d", (it->second.mRoadID+"_"+it->second.mLaneID).c_str(), it->first );
+
+		if ( currFlow == flow ) {
+			// This car is part of the same flow.
+			chi += dist;
+			rho += dv;
+			beta++;
+		}
+
+	}
+
+	delta /= alpha;
+	sigma /= alpha;
+	chi /= beta;
+	rho /= beta;
+
+	float NCL, ADL, AVL;
+
+	NCL =  beta + alpha * laneWeight;
+	ADL = delta +   chi * laneWeight;
+	AVL = sigma +   rho * laneWeight;
+
+	return NCL + ADL + AVL;
 
 }

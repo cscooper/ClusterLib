@@ -33,7 +33,13 @@ PROJECTRELATIVE_PATH = src
 O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
-OBJS = $O/ClusterNetworkLayer.o $O/LowestIdCluster.o $O/LSUFCluster.o $O/HighestDegreeCluster.o $O/ClusterControlMessage_m.o
+OBJS = \
+    $O/LSUFData.o \
+    $O/ClusterNetworkLayer.o \
+    $O/LowestIdCluster.o \
+    $O/LSUFCluster.o \
+    $O/HighestDegreeCluster.o \
+    $O/ClusterControlMessage_m.o
 
 # Message files
 MSGFILES = \
@@ -157,6 +163,7 @@ $O/ClusterNetworkLayer.o: ClusterNetworkLayer.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h \
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIMobility.h \
 	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManager.h
 $O/HighestDegreeCluster.o: HighestDegreeCluster.cc \
 	ClusterControlMessage_m.h \
@@ -193,6 +200,7 @@ $O/LSUFCluster.o: LSUFCluster.cc \
 	ClusterControlMessage_m.h \
 	ClusterNetworkLayer.h \
 	LSUFCluster.h \
+	LSUFData.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
@@ -220,6 +228,8 @@ $O/LSUFCluster.o: LSUFCluster.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/LSUFData.o: LSUFData.cc \
+	LSUFData.h
 $O/LowestIdCluster.o: LowestIdCluster.cc \
 	ClusterControlMessage_m.h \
 	ClusterNetworkLayer.h \

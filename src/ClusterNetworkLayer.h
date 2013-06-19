@@ -56,6 +56,8 @@ public:
 		double mWeight;						/**< Weight of this node. */
 		Coord mPosition;					/**< Position of the Neighbour. */
 		Coord mVelocity;					/**< Velocity of the Neighbour. */
+		std::string mRoadID;				/**< The ID of the road this car is on. */
+		std::string mLaneID;				/**< The ID of the lane this car is on. */
 		bool mIsClusterHead;				/**< Is this node a CH? */
 		unsigned int mFreshness;			/**< How long this node will stay in range of this neighbour. Measured in beats. */
 	};
@@ -68,7 +70,11 @@ protected:
 
 	unsigned int mID;						/**< Node's unique ID. */
 	double mWeight;							/**< Weight of this node. */
+
 	BaseMobility *mMobility;				/**< Pointer to the vehicle's mobility module (to get location and velocity). */
+	std::string mRoadID;					/**< The ID of the road this car is on. */
+	std::string mLaneID;					/**< The ID of the lane this car is on. */
+
 	int mClusterHead;						/**< ID of the CH we're associated with (initialised to -1). */
 	bool mIsClusterHead;					/**< Is this node a CH? */
 	NodeIdSet mClusterMembers;				/**< Set of CMs associated with this node (if it is a CH) */
@@ -76,6 +82,8 @@ protected:
 	simtime_t mClusterStartTime;			/**< The time at which this node last became a CH. */
 
 	double mTransmitRangeSq;				/**< Required for the freshness calculation. Obtained from the PhyLayer module. */
+
+	bool mInitialised;						/**< Set to true if the init function has been called. */
 
     /**
      * @name Messages

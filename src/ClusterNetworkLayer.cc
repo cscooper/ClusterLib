@@ -30,6 +30,7 @@
 #include "ChannelAccess.h"
 
 #include "TraCIScenarioManager.h"
+#include "TraCIMobility.h"
 
 #include "ClusterNetworkLayer.h"
 
@@ -47,6 +48,8 @@ void ClusterNetworkLayer::initialize(int stage)
     BaseNetwLayer::initialize(stage);
 
     if(stage == 1) {
+
+    	mInitialised = false;
 
     	// set up the node.
     	mID = getId();
@@ -85,6 +88,7 @@ void ClusterNetworkLayer::initialize(int stage)
     	WATCH_MAP( mNeighbours );
     	WATCH( mWeight );
     	WATCH( mClusterHead );
+
 
 //     	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
 //     	char strNodeName[50];
@@ -268,6 +272,13 @@ double ClusterNetworkLayer::calculateWeight() {
 /** @brief Initiate clustering. */
 void ClusterNetworkLayer::init() {
 
+	// First get the lane we're in.
+	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
+	std::string s = pManager->commandGetLaneId( dynamic_cast<TraCIMobility*>(mMobility)->getExternalId() );
+	int i = s.find("_");
+	mRoadID = s.substr( 0, i );
+	mLaneID = s.substr( i+1 );
+
 	int nMax = chooseClusterHead();
 	if ( nMax == -1 ) {
 
@@ -288,6 +299,8 @@ void ClusterNetworkLayer::init() {
 		sendClusterMessage( JOIN_MESSAGE, nMax );
 
 	}
+
+	mInitialised = true;
 
 }
 
@@ -317,6 +330,12 @@ void ClusterNetworkLayer::processBeat() {
 		}
 
 	}
+
+	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
+	std::string s = pManager->commandGetLaneId( dynamic_cast<TraCIMobility*>(mMobility)->getExternalId() );
+	int i = s.find("_");
+	mRoadID = s.substr( 0, i );
+	mLaneID = s.substr( i+1 );
 
 // 	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
 // 	char strNodeName[10];
@@ -589,6 +608,8 @@ void ClusterNetworkLayer::updateNeighbour( ClusterControlMessage *m ) {
 	// update the neighbour data
 	mNeighbours[m->getNodeId()].mWeight = m->getWeight();
 	mNeighbours[m->getNodeId()].mIsClusterHead = m->getIsClusterHead();
+	mNeighbours[m->getNodeId()].mRoadID = m->getRoadId();
+	mNeighbours[m->getNodeId()].mLaneID = m->getLaneId();
 	mNeighbours[m->getNodeId()].mPosition.x = m->getXPosition();
 	mNeighbours[m->getNodeId()].mPosition.y = m->getYPosition();
 	mNeighbours[m->getNodeId()].mVelocity.x = m->getXVelocity();
@@ -619,6 +640,9 @@ void ClusterNetworkLayer::sendClusterMessage( int kind, int dest, int nHops ) {
     if ( nHops == -1 )
     	nHops = mHopCount;
     pkt->setTtl( nHops );
+
+    pkt->setRoadId( mRoadID.c_str() );
+    pkt->setLaneId( mLaneID.c_str() );
 
     Coord p = mMobility->getCurrentPosition();
     pkt->setXPosition( p.x );
