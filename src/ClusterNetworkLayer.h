@@ -51,6 +51,14 @@ public:
 		LAST_CLUSTER_MESSAGE_KIND
 	};
 
+	/**
+	 * @brief Types of cluster death.
+	 */
+	enum ClusterDeath {
+		CD_Attrition = 0,
+		CD_Cannibal
+	};
+
 
 	struct Neighbour {
 		double mWeight;						/**< Weight of this node. */
@@ -80,6 +88,7 @@ protected:
 	NodeIdSet mClusterMembers;				/**< Set of CMs associated with this node (if it is a CH) */
 	NeighbourSet mNeighbours;				/**< The set of neighbours near this node. */
 	simtime_t mClusterStartTime;			/**< The time at which this node last became a CH. */
+	int mCurrentMaximumClusterSize;			/**< The highest number of nodes in the cluster of which we are currently head. */
 
 	double mTransmitRangeSq;				/**< Required for the freshness calculation. Obtained from the PhyLayer module. */
 
@@ -156,7 +165,10 @@ protected:
 	simsignal_t mSigClusterSize;		/**< Size of the cluster for which this node is CH. */
 	simsignal_t mSigHeadChange;			/**< Changes in CH for this node. */
 
-	std::ofstream mClusterDeathOutput;	/**< The handle for the file where locations of cluster death will be logged. */
+	simsignal_t mSigClusterDeathType;	/**< Type of cluster death this node goes through. */
+	simsignal_t mSigClusterDeathX;		/**< X position of cluster deaths. */
+	simsignal_t mSigClusterDeathY;		/**< Y position of cluster deaths. */
+
 
 	/*@}*/
 

@@ -59,6 +59,7 @@ def ComputeWeights( options ):
 
 	# Got all the weights.
 	# Now we save the data to a file.
+	print "Saving weights to " + options.outFile
 	f = open( options.outFile, "w" )
 	f.write( str(len(laneWeights)) + "\n" )
 	for lane in laneWeights:
@@ -78,7 +79,7 @@ def ParseOptions():
 		sys.exit()
 
 	if not options.outFile:
-		options.outFile = options.netFile.split(".")[0] + ".lsuf"
+		options.outFile = options.netFile.split(".net.")[0] + ".lsuf"
 
 	return options
 

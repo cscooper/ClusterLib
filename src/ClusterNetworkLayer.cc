@@ -83,6 +83,10 @@ void ClusterNetworkLayer::initialize(int stage)
     	mSigClusterSize = registerSignal( "sigClusterSize" );
     	mSigHeadChange = registerSignal( "sigHeadChange" );
 
+    	mSigClusterDeathType = registerSignal( "sigDeathType" );
+    	mSigClusterDeathX = registerSignal( "sigDeathX" );
+    	mSigClusterDeathY = registerSignal( "sigDeathY" );
+
     	// set up watches
     	WATCH_SET( mClusterMembers );
     	WATCH_MAP( mNeighbours );
@@ -396,11 +400,18 @@ void ClusterNetworkLayer::linkFailure( unsigned int nodeId ) {
 		// also check if we've lost all our CMs
 		if ( mClusterMembers.size() == 1 ) {
 
+			Coord pos = mMobility->getCurrentPosition();
 			/*
 			 * We've lost all our CMs, so this cluster counts as dead.
-			 * Calculate it's lifetime and log it.
+			 * Calculate it's lifetime, type of death, position of death, and maximum size, and log it.
 			 */
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+			emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
+			emit( mSigClusterDeathType, (double)CD_Attrition );
+			emit( mSigClusterDeathX, pos.x );
+			emit( mSigClusterDeathY, pos.y );
+
+			mCurrentMaximumClusterSize = 0;
 			mClusterStartTime = 0;
 	    	//std::cerr << "Cluster (CH: " << mID << ") has died of attrition!\n";
 
@@ -476,7 +487,14 @@ void ClusterNetworkLayer::receiveHelloMessage( ClusterControlMessage *m ) {
 		// If this was a CH, the cluster is dead, so log lifetime
 		if ( mIsClusterHead && mClusterMembers.size() > 1 ) {
 
+			Coord pos = mMobility->getCurrentPosition();
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+			emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
+			emit( mSigClusterDeathType, (double)CD_Cannibal );
+			emit( mSigClusterDeathX, pos.x );
+			emit( mSigClusterDeathY, pos.y );
+
+			mCurrentMaximumClusterSize = 0;
 			mClusterStartTime = 0;
 	    	//std::cerr << "Cluster (CH: " << mID << ") has died! " << mID << " joined CH" << m->getNodeId() << ". w("  << mID <<  ")=" << mWeight << "; w("  << m->getNodeId() <<  ")=" << m->getWeight() << "; \n";
 
@@ -514,8 +532,16 @@ void ClusterNetworkLayer::receiveChMessage( ClusterControlMessage *m ) {
 		// If this was a CH, the cluster is dead, so log lifetime
 		if ( mIsClusterHead ) {
 
+			Coord pos = mMobility->getCurrentPosition();
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+			emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
+			emit( mSigClusterDeathType, (double)CD_Cannibal );
+			emit( mSigClusterDeathX, pos.x );
+			emit( mSigClusterDeathY, pos.y );
+
+			mCurrentMaximumClusterSize = 0;
 			mClusterStartTime = 0;
+
 	    	//std::cerr << "Cluster (CH: " << mID << ") has died! " << mID << " joined CH" << m->getNodeId() << ". w("  << mID <<  ")=" << mWeight << "; w("  << m->getNodeId() <<  ")=" << m->getWeight() << "; \n";
             emit( mSigHeadChange, 1 );
 
@@ -541,7 +567,7 @@ void ClusterNetworkLayer::receiveChMessage( ClusterControlMessage *m ) {
 			}
 
 			if ( sizeChanged )
-				emit( mSigClusterSize, mClusterMembers.size() );
+				mCurrentMaximumClusterSize = std::max( mCurrentMaximumClusterSize, (int)mClusterMembers.size() );
 
 		}
 
@@ -580,13 +606,22 @@ void ClusterNetworkLayer::receiveJoinMessage( ClusterControlMessage *m ) {
 			if ( mClusterMembers.size() == 1 ) {
 		    	//std::cerr << "Cluster (CH: " << mID << ") has died of attrition!\n";
 	            emit( mSigClusterLifetime, simTime() - mClusterStartTime );
-	            mClusterStartTime = 0;
+				Coord pos = mMobility->getCurrentPosition();
+				emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+				emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
+				emit( mSigClusterDeathType, (double)CD_Attrition );
+				emit( mSigClusterDeathX, pos.x );
+				emit( mSigClusterDeathY, pos.y );
+
+				mCurrentMaximumClusterSize = 0;
+				mClusterStartTime = 0;
+				sizeChanged = false;
 			}
 
 		}
 
 		if ( sizeChanged )
-			emit( mSigClusterSize, mClusterMembers.size() );
+			mCurrentMaximumClusterSize = std::max( mCurrentMaximumClusterSize, (int)mClusterMembers.size() );
 
 	} else if ( mClusterHead == m->getNodeId() ) {
 

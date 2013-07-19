@@ -34,11 +34,11 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
-    $O/LSUFData.o \
+    $O/HighestDegreeCluster.o \
     $O/ClusterNetworkLayer.o \
+    $O/LSUFData.o \
     $O/LowestIdCluster.o \
     $O/LSUFCluster.o \
-    $O/HighestDegreeCluster.o \
     $O/ClusterControlMessage_m.o
 
 # Message files
