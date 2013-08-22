@@ -22,7 +22,7 @@
 #include "AddressingInterface.h"
 #include "SimpleAddress.h"
 #include "FindModule.h"
-#include "ClusterControlMessage_m.h"
+#include "MdmacControlMessage_m.h"
 #include "ArpInterface.h"
 #include "NetwToMacControlInfo.h"
 #include "BaseMobility.h"
@@ -54,7 +54,7 @@ void LSUFCluster::initialize( int stage ) {
 
     }
 
-    ClusterNetworkLayer::initialize( stage );
+    MdmacNetworkLayer::initialize( stage );
 
 }
 
@@ -71,7 +71,7 @@ void LSUFCluster::finish() {
 
     }
 
-    ClusterNetworkLayer::finish();
+    MdmacNetworkLayer::finish();
 
 }
 

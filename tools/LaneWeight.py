@@ -4,7 +4,6 @@ import sumolib
 from VectorMath import *
 from optparse import OptionParser
 
-
 def ComputeWeights( options ):
 
 	netFile = sumolib.net.readNet( options.netFile )
@@ -25,6 +24,8 @@ def ComputeWeights( options ):
 
 		# If there are no outgoing connections, skip this edge.
 		if len(conns) == 0:
+			for i in range(0,edge.getLaneNumber()):
+				laneWeights.append( [edge.getLane(i).getID(), 1.0, 0] )
 			continue
 
 		# Scan the connections in the list.
@@ -65,7 +66,6 @@ def ComputeWeights( options ):
 	for lane in laneWeights:
 		f.write( lane[0] + " " + str(lane[1]) + " " + str(lane[2]) + "\n" )
 	f.close()
-
 
 
 def ParseOptions():

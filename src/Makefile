@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for libClusterLib
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep --make-so -I/home/craig/Documents/PhD/simulations/ClusterLib/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L/home/craig/Documents/PhD/simulations/ClusterLib/URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
+#  opp_makemake -f --deep --make-so -I/media/Data/PhD/simulations/ClusterLib/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L/media/Data/PhD/simulations/ClusterLib/URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
 #
 
 # Name of target to be created (-o option)
@@ -34,16 +34,22 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
-    $O/HighestDegreeCluster.o \
-    $O/ClusterNetworkLayer.o \
-    $O/LSUFData.o \
-    $O/LowestIdCluster.o \
+    $O/ClusterDraw.o \
     $O/LSUFCluster.o \
-    $O/ClusterControlMessage_m.o
+    $O/LSUFData.o \
+    $O/MdmacNetworkLayer.o \
+    $O/RmacNetworkLayer.o \
+    $O/ClusterTestScenarioManager.o \
+    $O/HighestDegreeCluster.o \
+    $O/LowestIdCluster.o \
+    $O/ClusterAlgorithm.o \
+    $O/MdmacControlMessage_m.o \
+    $O/RmacControlMessage_m.o
 
 # Message files
 MSGFILES = \
-    ClusterControlMessage.msg
+    MdmacControlMessage.msg \
+    RmacControlMessage.msg
 
 # Other makefile variables (-K)
 VEINS_2_0_PROJ=../../veins-2.0
@@ -99,7 +105,7 @@ $(TARGET) : $O/$(TARGET)
 
 $O/$(TARGET): $(OBJS)  $(wildcard $(EXTRA_OBJS)) Makefile
 	@$(MKPATH) $O
-	$(SHLIB_LD) -o $O/$(TARGET)  $(OBJS) $(EXTRA_OBJS) $(LIBS) $(OMNETPP_LIBS) $(LDFLAGS)
+	$(SHLIB_LD) -o $O/$(TARGET)  $(OBJS) $(EXTRA_OBJS) $(AS_NEEDED_OFF) $(WHOLE_ARCHIVE_ON) $(LIBS) $(WHOLE_ARCHIVE_OFF) $(OMNETPP_LIBS) $(LDFLAGS)
 	$(SHLIB_POSTPROCESS) $O/$(TARGET)
 
 .PHONY:
@@ -127,48 +133,68 @@ depend:
 	$(MAKEDEPEND) $(INCLUDE_PATH) -f Makefile -P\$$O/ -- $(MSG_CC_FILES)  ./*.cc
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
-$O/ClusterControlMessage_m.o: ClusterControlMessage_m.cc \
-	ClusterControlMessage_m.h \
-	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
-$O/ClusterNetworkLayer.o: ClusterNetworkLayer.cc \
-	ClusterControlMessage_m.h \
-	ClusterNetworkLayer.h \
-	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
-	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
-	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
-	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/AddressingInterface.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/ArpInterface.h \
+$O/ClusterAlgorithm.o: ClusterAlgorithm.cc \
+	ClusterAlgorithm.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseLayer.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/BaseMacLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseNetwLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
-	$(VEINS_2_0_PROJ)/src/base/phyLayer/Interpolation.h \
-	$(VEINS_2_0_PROJ)/src/base/phyLayer/MappingBase.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/ClusterDraw.o: ClusterDraw.cc \
+	ClusterDraw.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/ClusterTestScenarioManager.o: ClusterTestScenarioManager.cc \
+	ClusterAlgorithm.h \
+	ClusterDraw.h \
+	ClusterTestScenarioManager.h \
+	RmacControlMessage_m.h \
+	RmacNetworkLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
+	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseNetwLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/FindModule.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/NetwControlInfo.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/NetwToMacControlInfo.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h \
-	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIMobility.h \
-	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManager.h
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManager.h \
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManagerLaunchd.h
 $O/HighestDegreeCluster.o: HighestDegreeCluster.cc \
-	ClusterControlMessage_m.h \
-	ClusterNetworkLayer.h \
+	ClusterAlgorithm.h \
 	HighestDegreeCluster.h \
+	MdmacControlMessage_m.h \
+	MdmacNetworkLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
@@ -197,10 +223,11 @@ $O/HighestDegreeCluster.o: HighestDegreeCluster.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
 $O/LSUFCluster.o: LSUFCluster.cc \
-	ClusterControlMessage_m.h \
-	ClusterNetworkLayer.h \
+	ClusterAlgorithm.h \
 	LSUFCluster.h \
 	LSUFData.h \
+	MdmacControlMessage_m.h \
+	MdmacNetworkLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
@@ -231,9 +258,10 @@ $O/LSUFCluster.o: LSUFCluster.cc \
 $O/LSUFData.o: LSUFData.cc \
 	LSUFData.h
 $O/LowestIdCluster.o: LowestIdCluster.cc \
-	ClusterControlMessage_m.h \
-	ClusterNetworkLayer.h \
+	ClusterAlgorithm.h \
 	LowestIdCluster.h \
+	MdmacControlMessage_m.h \
+	MdmacNetworkLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
@@ -261,4 +289,82 @@ $O/LowestIdCluster.o: LowestIdCluster.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/MdmacControlMessage_m.o: MdmacControlMessage_m.cc \
+	MdmacControlMessage_m.h \
+	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/MdmacNetworkLayer.o: MdmacNetworkLayer.cc \
+	ClusterAlgorithm.h \
+	MdmacControlMessage_m.h \
+	MdmacNetworkLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
+	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/AddressingInterface.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/ArpInterface.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMacLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseNetwLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/phyLayer/Interpolation.h \
+	$(VEINS_2_0_PROJ)/src/base/phyLayer/MappingBase.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FindModule.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/NetwControlInfo.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/NetwToMacControlInfo.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h \
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIMobility.h \
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManager.h
+$O/RmacControlMessage_m.o: RmacControlMessage_m.cc \
+	RmacControlMessage_m.h \
+	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/RmacNetworkLayer.o: RmacNetworkLayer.cc \
+	ClusterAlgorithm.h \
+	RmacControlMessage_m.h \
+	RmacNetworkLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
+	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/AddressingInterface.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/ArpInterface.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMacLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseNetwLayer.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/phyLayer/Interpolation.h \
+	$(VEINS_2_0_PROJ)/src/base/phyLayer/MappingBase.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FindModule.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/NetwControlInfo.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/NetwToMacControlInfo.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h \
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIMobility.h \
+	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManager.h
 

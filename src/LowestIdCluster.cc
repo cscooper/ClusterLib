@@ -23,7 +23,7 @@
 #include "AddressingInterface.h"
 #include "SimpleAddress.h"
 #include "FindModule.h"
-#include "ClusterControlMessage_m.h"
+#include "MdmacControlMessage_m.h"
 #include "ArpInterface.h"
 #include "NetwToMacControlInfo.h"
 #include "BaseMobility.h"

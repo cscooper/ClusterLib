@@ -24,15 +24,15 @@
 #include <set>
 #include <map>
 
-#include "ClusterControlMessage_m.h"
-#include "ClusterNetworkLayer.h"
+#include "MdmacControlMessage_m.h"
+#include "MdmacNetworkLayer.h"
 
 #include "LSUFData.h"
 
 /**
  * Implements the Lane-Sense Utility Function (LSUF) Clustering metric.
  */
-class LSUFCluster : public ClusterNetworkLayer
+class LSUFCluster : public MdmacNetworkLayer
 {
 public:
     /** @brief Initialization of the module and some variables*/

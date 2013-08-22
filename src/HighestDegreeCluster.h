@@ -24,14 +24,14 @@
 #include <set>
 #include <map>
 
-#include "ClusterControlMessage_m.h"
-#include "ClusterNetworkLayer.h"
+#include "MdmacControlMessage_m.h"
+#include "MdmacNetworkLayer.h"
 
 /**
  * Implements the Highest Degree Clustering mechanism.
  * The degree is the number of nodes with which this node has a connection.
  */
-class HighestDegreeCluster : public ClusterNetworkLayer {
+class HighestDegreeCluster : public MdmacNetworkLayer {
 
 protected:
     /** @brief Compute the CH weight for this node. */

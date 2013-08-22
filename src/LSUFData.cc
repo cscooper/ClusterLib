@@ -77,8 +77,11 @@ void LSUFData::release() {
 /** Get the weight and flow ID of the given lane. */
 bool LSUFData::getLaneWeight( std::string strLane, float *weight, unsigned char *flow ) {
 
-    if ( mLaneWeights.find( strLane ) == mLaneWeights.end() )
-        return false;
+    if ( mLaneWeights.find( strLane ) == mLaneWeights.end() ) {
+        *flow = 0;
+	*weight = 1;
+        return true;
+    }
 
     if ( weight )
     	*weight = mLaneWeights[strLane].mWeight;

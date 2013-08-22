@@ -18,7 +18,7 @@ package clusterlib;
 //
 // Implements the Lane-Sense Utility Function (LSUF) Clustering metric.
 //
-simple LSUFCluster extends ClusterNetworkLayer
+simple LSUFCluster extends MdmacNetworkLayer
 {
     parameters:
         @class(LSUFCluster);

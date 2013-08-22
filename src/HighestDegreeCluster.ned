@@ -19,7 +19,7 @@ package clusterlib;
 // Implements the Highest Degree Clustering mechanism.
 // The degree is the number of nodes with which this node has a connection.
 //
-simple HighestDegreeCluster extends ClusterNetworkLayer
+simple HighestDegreeCluster extends MdmacNetworkLayer
 {
     parameters:
         @class(HighestDegreeCluster);

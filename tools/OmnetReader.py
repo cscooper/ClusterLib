@@ -2,6 +2,7 @@
 
 import os, numpy
 from VectorMath import *
+import subprocess
 
 class VersionException(Exception):
 	def __init__(self,receivedVersionNumber):
@@ -81,76 +82,75 @@ class Run:
 		self.runAttributes = {}
 
 		fileName = self.directory+"/"+self.configName+"-"+str(self.runId)+".sca"
-		f = open(fileName, "r")
-		lineIndex = 1
-		try:
+		lineIndex = 0
+		with open(fileName, "r") as f:
 			for line in f:
-				# parse the current line
-				data = line.split()
-				if len(data) == 0:
-					continue
-				if data[0] == "version":
-					self.version = int(data[1])
-					if self.version != 2:
-						raise VersionException(self.version)
+				try:
+					# parse the current line
+					lineIndex += 1
+					data = line.split()
+					if len(data) == 0:
+						continue
+					if data[0] == "version":
+						self.version = int(data[1])
+						if self.version != 2:
+							raise VersionException(self.version)
 
-				elif data[0] == "run":
-					if foundRun:
-						raise Exception("Run defined multiple times in '"+fileName+"'")
-					foundRun = True
-					lastData = "run"
+					elif data[0] == "run":
+						if foundRun:
+							raise Exception("Run defined multiple times in '"+fileName+"'")
+						foundRun = True
+						lastData = "run"
 
-				elif data[0] == "attr":
-					if data[1] == '""':
-						continue # Skip empties
-					if lastData == "run":
-						attrStr = ""
-						for a in data[2:len(data)]:
-							attrStr += a
-						attrStr = attrStr.translate(None,'"\\')
-						self.runAttributes[data[1]] = attrStr
-					elif lastData == "scalar":
-						self.scalars[lastScalar.moduleName][lastScalar.name].attributes[data[1]] = data[2]
-					elif lastData == "statistic":
-						self.statistics[lastScalar.moduleName][lastScalar.name].attributes[data[1]] = data[2]
-					else:
-						raise Exception("Unknown attribute '"+data[1]+"' at line "+str(lineIndex)+" in '"+fileName+"'")
-				elif data[0] == "scalar":
-					moduleName = data[1]
-					scalarName = data[2].split(":")[0]
-					scalarValue = float(data[3])
-					if not moduleName in self.scalars.keys():
-						self.scalars[moduleName] = {}
-					else:
-						if scalarName in self.scalars[moduleName].keys():
-							raise Exception("Scalar '"+moduleName+"/"+scalarName+"' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
-					self.scalars[moduleName][scalarName] = Scalar(scalarName,moduleName,scalarValue)
-					lastScalar = self.scalars[moduleName][scalarName]
-					lastData = "scalar"
-					self.scalarIndices.append( [moduleName, scalarName] )
-				elif data[0] == "statistic":
-					moduleName = data[1]
-					statisticName = data[2].split(":")[0]
-					if not moduleName in self.statistics.keys():
-						self.statistics[moduleName] = {}
-					else:
-						if statisticName in self.statistics[moduleName].keys():
-							raise Exception("Statistic '"+moduleName+"/"+scalarName+"' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
-					self.statistics[moduleName][statisticName] = Statistic(statisticName,moduleName)
-					lastScalar = self.statistics[moduleName][statisticName]
-					lastData = "statistic"
-					self.statisticsIndices.append( [moduleName, statisticName] )
-				elif data[0] == "field":
-					if lastData is not "statistic":
-						raise Exception("Found field '" + data[1] + "' without statistic at line "+str(lineIndex)+" in '"+fileName+"'")
-					if data[1] in self.statistics[lastScalar.moduleName][lastScalar.name].fields:
-						raise Exception("Statistic field '" + data[1] + "' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
-					self.statistics[lastScalar.moduleName][lastScalar.name].fields[data[1]] = float(data[2])
+					elif data[0] == "attr":
+						if data[1] == '""':
+							continue # Skip empties
+						if lastData == "run":
+							attrStr = ""
+							for a in data[2:len(data)]:
+								attrStr += a
+							attrStr = attrStr.translate(None,'"\\')
+							self.runAttributes[data[1]] = attrStr
+						elif lastData == "scalar":
+							self.scalars[lastScalar.moduleName][lastScalar.name].attributes[data[1]] = data[2]
+						elif lastData == "statistic":
+							self.statistics[lastScalar.moduleName][lastScalar.name].attributes[data[1]] = data[2]
+						else:
+							raise Exception("Unknown attribute '"+data[1]+"' at line "+str(lineIndex)+" in '"+fileName+"'")
+					elif data[0] == "scalar":
+						moduleName = data[1]
+						scalarName = data[2].split(":")[0]
+						scalarValue = float(data[3])
+						if not moduleName in self.scalars.keys():
+							self.scalars[moduleName] = {}
+						else:
+							if scalarName in self.scalars[moduleName].keys():
+								raise Exception("Scalar '"+moduleName+"/"+scalarName+"' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
+						self.scalars[moduleName][scalarName] = Scalar(scalarName,moduleName,scalarValue)
+						lastScalar = self.scalars[moduleName][scalarName]
+						lastData = "scalar"
+						self.scalarIndices.append( [moduleName, scalarName] )
+					elif data[0] == "statistic":
+						moduleName = data[1]
+						statisticName = data[2].split(":")[0]
+						if not moduleName in self.statistics.keys():
+							self.statistics[moduleName] = {}
+						else:
+							if statisticName in self.statistics[moduleName].keys():
+								raise Exception("Statistic '"+moduleName+"/"+scalarName+"' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
+						self.statistics[moduleName][statisticName] = Statistic(statisticName,moduleName)
+						lastScalar = self.statistics[moduleName][statisticName]
+						lastData = "statistic"
+						self.statisticsIndices.append( [moduleName, statisticName] )
+					elif data[0] == "field":
+						if lastData is not "statistic":
+							raise Exception("Found field '" + data[1] + "' without statistic at line "+str(lineIndex)+" in '"+fileName+"'")
+						if data[1] in self.statistics[lastScalar.moduleName][lastScalar.name].fields:
+							raise Exception("Statistic field '" + data[1] + "' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
+						self.statistics[lastScalar.moduleName][lastScalar.name].fields[data[1]] = float(data[2])
 
-				lineIndex += 1
-		except IndexError:
-			print "IndexError exception raised at line " + str(lineIndex) + " in file " + fileName
-		f.close()
+				except IndexError:
+					print "IndexError exception raised at line " + str(lineIndex) + " in file " + fileName + " (" + line + ")"
 
 	def loadVectors(self):
 		foundRun = False
@@ -161,128 +161,146 @@ class Run:
 		self.vectorIndices = {} # contains tuples of moduleName,vectorName. VectorId used as keys
 
 		fileName = self.directory+"/"+self.configName+"-"+str(self.runId)+".vci"
-		f = open(fileName, "r")
-		lineIndex = 1
-		try:
+		lineIndex = 0
+		with open(fileName, "r") as f:
 			for line in f:
-				# parse the current line
-				data = line.split()
+				try:
+					lineIndex += 1
+					# parse the current line
+					data = line.split()
 
-				if len(data) == 0:
-					continue
-				if data[0] == "version":
-					self.version = int(data[1])
-					if self.version != 2:
-						raise VersionException(self.version)
+					if len(data) == 0:
+						continue
+					if data[0] == "version":
+						self.version = int(data[1])
+						if self.version != 2:
+							raise VersionException(self.version)
 
-				elif data[0] == "run":
-					if foundRun:
-						raise Exception("Run defined multiple times in '"+fileName+"'")
-					foundRun = True
-					lastData = "run"
+					elif data[0] == "run":
+						if foundRun:
+							raise Exception("Run defined multiple times in '"+fileName+"'")
+						foundRun = True
+						lastData = "run"
 
-				elif data[0] == "attr":
-					if data[1] == '""':
-						continue # Skip empties
-					if lastData == "run":
-						pass
-					elif lastData == "vector":
-						self.vectors[lastVector.moduleName][lastVector.name].attributes[data[1]] = data[2]
-					else:
-						raise Exception("Unknown attribute '"+data[1]+"' at line "+str(lineIndex)+" in '"+fileName+"'")
+					elif data[0] == "attr":
+						if data[1] == '""':
+							continue # Skip empties
+						if lastData == "run":
+							pass
+						elif lastData == "vector":
+							self.vectors[lastVector.moduleName][lastVector.name].attributes[data[1]] = data[2]
+						else:
+							raise Exception("Unknown attribute '"+data[1]+"' at line "+str(lineIndex)+" in '"+fileName+"'")
 
-				elif data[0] == "vector":
-					vectorNumber = int(data[1])
-					vectorModule = data[2]
-					vectorName = data[3]
-					if not vectorModule in self.vectors.keys():
-						self.vectors[vectorModule] = {}
-					else:
-						if vectorName in self.vectors[vectorModule].keys():
-							raise Exception("Vector '"+vectorModule+"/"+vectorName+"' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
+					elif data[0] == "vector":
+						vectorNumber = int(data[1])
+						vectorModule = data[2]
+						vectorName = data[3]
+						if not vectorModule in self.vectors.keys():
+							self.vectors[vectorModule] = {}
+						else:
+							if vectorName in self.vectors[vectorModule].keys():
+								raise Exception("Vector '"+vectorModule+"/"+vectorName+"' redefined at line "+str(lineIndex)+" in '"+fileName+"'")
 
-					self.vectors[vectorModule][vectorName] = Vector( vectorNumber, vectorName, vectorModule, data[4], self )
-					lastVector = self.vectors[vectorModule][vectorName]
-					lastData = "vector"
-					self.vectorIndices[vectorNumber] = (vectorModule,vectorName)
+						self.vectors[vectorModule][vectorName] = Vector( vectorNumber, vectorName, vectorModule, data[4], self )
+						lastVector = self.vectors[vectorModule][vectorName]
+						lastData = "vector"
+						self.vectorIndices[vectorNumber] = (vectorModule,vectorName)
 
-				elif data[0].isdigit():
-					vectorNumber = int(data[0])
-					v = self.vectorIndices[vectorNumber]
-					blockOffset = int(data[1])
-					blockLength = int(data[2])
-					self.vectors[v[0]][v[1]].addIndexData( blockOffset, blockLength )
+					elif data[0].isdigit():
+						vectorNumber = int(data[0])
+						v = self.vectorIndices[vectorNumber]
+						blockOffset = int(data[1])
+						blockLength = int(data[2])
+						self.vectors[v[0]][v[1]].addIndexData( blockOffset, blockLength )
 
-				lineIndex += 1
-		except IndexError:
-			print "IndexError exception raised at line " + str(lineIndex) + " in file " + fileName
-		f.close()
+				except IndexError:
+					print "IndexError exception raised at line " + str(lineIndex) + " in file " + fileName
 
 
 class DataContainer:
 
-	def __init__(self,configName,directory):
+	def __init__(self,configName,directory,useTar=False):
+		self.useTar = useTar
 		self.configName = configName
 		self.directory = directory
 		self.loadRuns()	
 		self.currentRun = None
 
 	def loadRuns(self):
+		# Get all the run numbers
+		if not self.useTar:
+			self.runList = [ int( file[file.rfind("-")+1:file.rfind(".")] ) for file in os.listdir(self.directory) if self.configName in file and "sca" in file ]
+		else:
+			self.runList = [ int( file[file.find("-")+1:file.find(".tar")] ) for file in os.listdir(self.directory) if self.configName in file and "tar" in file ]
+
 		# get list of files matching the config name
-		fileList = [ file for file in os.listdir(self.directory) if self.configName in file and "sca" in file ]
-		print self.configName + ": " + str(len(fileList)) + " runs found."
-		self.runs = {}
-		for f in fileList:
-			runId = int( f[f.rfind("-")+1:f.rfind(".")] )
-			self.runs[runId] = Run(runId,self.configName,self.directory)
+		#fileList = [ file for file in os.listdir(self.directory) if self.configName in file and "sca" in file ]
+		#print self.configName + ": " + str(len(fileList)) + " runs found."
+		#self.runs = {}
+		#for f in fileList:
+			#runId = int( f[f.rfind("-")+1:f.rfind(".")] )
+			#self.runs[runId] = Run(runId,self.configName,self.directory)
 
 	def getRunList(self):
-		return self.runs.keys()
+		return self.runList
 
 	def selectRun(self,runNumber):
-		self.currentRun = runNumber
+		if self.useTar:
+			subprocess.Popen( ['tar','-xf',self.directory+self.configName+'-'+str(runNumber)+'.tar.xz'] ).wait()
+		hasError = False
+		try:
+			self.currentRun = Run(runNumber,self.configName,"results")
+		except ValueError:
+			hasError = True
+		if self.useTar:
+			subprocess.Popen( ['rm','-r','results'], stdout=subprocess.PIPE, stderr=subprocess.PIPE ).wait()
+		if hasError:
+			raise Exception( "Run data has errors." )
+		#self.currentRun = runNumber
 
 	def getSelectedRun(self):
-		return self.runs[self.currentRun]
+		return self.currentRun
+		#return self.runs[self.currentRun]
 
 	def findModule(self,moduleName):
 		# this tries to locate an entry in the data container corresponding to the module name
-		return [mod for mod in self.runs[self.currentRun].scalars.iterkeys() if moduleName in mod]
+		return [mod for mod in self.currentRun.scalars.iterkeys() if moduleName in mod]
 
 	def getRunAttributes(self):
 		if self.currentRun == None:
 			raise Exception( "Asked for run attributes when no run has been selected." )
-		return self.runs[self.currentRun].runAttributes
+		return self.currentRun.runAttributes
 
 	def getVectorList(self):
 		if self.currentRun == None:
 			raise Exception( "Asked for vector list when no run has been selected." )
-		return self.runs[self.currentRun].vectorIndices.values()
+		return self.currentRun.vectorIndices.values()
 
 	def getVector(self,moduleName,vectorName):
 		if self.currentRun == None:
 			raise Exception( "Asked for vector data when no run has been selected." )
-		return self.runs[self.currentRun].vectors[moduleName][vectorName].getVectorData()
+		return self.currentRun.vectors[moduleName][vectorName].getVectorData()
 
 	def getScalarList(self):
 		if self.currentRun == None:
 			raise Exception( "Asked for scalar list when no run has been selected." )
-		return self.runs[self.currentRun].scalarIndices
+		return self.currentRun.scalarIndices
 
 	def getScalar(self,moduleName,scalarName):
 		if self.currentRun == None:
 			raise Exception( "Asked for scalar data when no run has been selected." )
-		return self.runs[self.currentRun].scalars[moduleName][scalarName]
+		return self.currentRun.scalars[moduleName][scalarName]
 
 	def getStatisticsList(self):
 		if self.currentRun == None:
 			raise Exception( "Asked for statistics list when no run has been selected." )
-		return self.runs[self.currentRun].statisticsIndices
+		return self.currentRun.statisticsIndices
 
 	def getStatistic(self,moduleName,statisticName):
 		if self.currentRun == None:
 			raise Exception( "Asked for statistics data when no run has been selected." )
-		return self.runs[self.currentRun].statistics[moduleName][statisticName]
+		return self.currentRun.statistics[moduleName][statisticName]
 
 
 def FindNearestTimeInVector(time,vec,lastIndex):

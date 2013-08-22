@@ -24,13 +24,13 @@
 #include <set>
 #include <map>
 
-#include "ClusterControlMessage_m.h"
-#include "ClusterNetworkLayer.h"
+#include "MdmacControlMessage_m.h"
+#include "MdmacNetworkLayer.h"
 
 /**
  * Implements the Lowest ID Clustering mechanism.
  */
-class LowestIdCluster : public ClusterNetworkLayer
+class LowestIdCluster : public MdmacNetworkLayer
 {
   protected:
     /** @brief Compute the CH weight for this node. */

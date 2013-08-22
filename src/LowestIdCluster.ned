@@ -19,7 +19,7 @@ package clusterlib;
 //
 // Implements the Lowest ID Clustering mechanism.
 //
-simple LowestIdCluster extends ClusterNetworkLayer
+simple LowestIdCluster extends MdmacNetworkLayer
 {
     parameters:
         @class(LowestIdCluster);
