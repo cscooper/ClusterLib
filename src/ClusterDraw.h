@@ -8,6 +8,8 @@
 #ifndef CLUSTERDRAW_H_
 #define CLUSTERDRAW_H_
 
+#ifndef NDEBUG
+
 #include <map>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
@@ -79,5 +81,7 @@ protected:
     void printStatus();
 
 };
+
+#endif /* #ifndef NDEBUG */
 
 #endif /* LSUFDATA_H_ */

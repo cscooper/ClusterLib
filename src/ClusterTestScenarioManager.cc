@@ -13,6 +13,7 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
+#ifndef NDEBUG
 
 #include <fstream>
 #include <queue>
@@ -135,6 +136,6 @@ void ClusterTestScenarioManager::finish() {
 
 
 
-
+#endif /* #ifndef NDEBUG */
 
 

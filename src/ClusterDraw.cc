@@ -1,9 +1,11 @@
 /*
- * LSUFData.cpp
+ * ClusterDraw.cpp
  *
  *  Created on: Jun 18, 2013
  *      Author: craig
  */
+
+#ifndef NDEBUG
 
 #include <cmath>
 #include <allegro5/allegro_primitives.h>
@@ -227,4 +229,4 @@ void ClusterDraw::printStatus() {
 }
 
 
-
+#endif /* #ifndef NDEBUG */

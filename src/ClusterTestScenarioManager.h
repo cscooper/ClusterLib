@@ -16,6 +16,8 @@
 #ifndef URAESCENARIOMANAGER_H_
 #define URAESCENARIOMANAGER_H_
 
+#ifndef NDEBUG
+
 #include <TraCIScenarioManagerLaunchd.h>
 
 #include "ClusterDraw.h"
@@ -51,6 +53,7 @@ class ClusterTestScenarioManagerAccess
 };
 
 
+#endif /* #ifndef NDEBUG */
 
 
 #endif /* DATACOLLECTORSCENARIOMANAGER_H_ */
