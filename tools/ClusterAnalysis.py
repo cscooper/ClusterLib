@@ -17,6 +17,7 @@ def parseDataCompileOptions( argv ):
 	optParser = OptionParser()
 	optParser.add_option("-d", "--directory", dest="directory", help="Define the results directory.")
 	optParser.add_option("-t", "--useTar", dest="useTar", action="store_true", help="Define whether the individual runs are compressed into tar files.")
+	optParser.add_option("-g", "--doGrid", dest="doGrid", action="store_true", help="Only process the grid simulations. If false, grid simulations won't be processed.")
 	optParser.add_option("-o", "--outputFile", dest="outputFile", help="Specify the output file")
 	(options, args) = optParser.parse_args(argv)
 
@@ -92,13 +93,13 @@ def collectResults( dataContainer ):
 		else:
 			results[resName].append( stat.fields['mean'] )
 
-	results['overhead'] = numpy.mean( results['overhead'] )
-	results['helloOverhead'] = numpy.mean( results['helloOverhead'] )
-	results['clusterLifetime'] = numpy.mean( results['clusterLifetime'] )
-	results['clusterSize'] = numpy.mean( results['clusterSize'] )
-	results['headChange'] = numpy.mean( results['headChange'] )
-	return results
+	colatedResults = {}
+	for key in results.iterkeys():
+		colatedResults[key + " Mean"] = numpy.mean( results[key] )
+		colatedResults[key +  " Max"] = max( results[key] )
+		colatedResults[key +  " Min"] = min( results[key] )
 
+	return colatedResults
 
 # Compile the data.
 def dataCompile( argv ):
@@ -114,6 +115,13 @@ def dataCompile( argv ):
 		runList = sorted(dataContainers[config].getRunList())
 		print "Found " + str(len(runList)) + " runs for " + config + "."
 
+		if ("grid" in config) != (options.doGrid):
+			if options.doGrid:
+				print "We've been asked to only process grid sims, and " + config + " is not one. Skipping."
+			else:
+				print "We've been asked to not process grid sims, and " + config + " is one. Skipping."
+			continue
+
 		# Iterate through the runs
 		for run in runList:
 			# Select the run
@@ -127,49 +135,101 @@ def dataCompile( argv ):
 			# Get the parameters of this run
 			runAttributes = dataContainers[config].getRunAttributes()
 			algorithm = runAttributes['networkType']
-			location = runAttributes['launchCfg'].lstrip('xmldoc(\\"maps').rstrip('.launchd.xml\\")').lstrip('/')
-			beaconInterval = runAttributes['beacon']
-			initialFreshness = runAttributes['initFreshness']
-			freshnessThreshold = runAttributes['freshThresh']
+			if options.doGrid:
+				laneCount = int(runAttributes['laneCount'])
+				roadLength = int(runAttributes['roadLength'])
+			else:
+				location = runAttributes['launchCfg'].lstrip('xmldoc(\\"maps').rstrip('.launchd.xml\\")').lstrip('/')
+			beaconInterval = float(runAttributes['beacon'])
+			initialFreshness = float(runAttributes['initFreshness'])
+			freshnessThreshold = float(runAttributes['freshThresh'])
 
 			# Collect the results for this run.
 			results = collectResults( dataContainers[config] )
 
-			if algorithm not in resultSet:
-				resultSet[algorithm] = {}
+			if options.doGrid:
+				# The location data is specified by the lane count and the road length.
+				if laneCount not in resultSet:
+					resultSet[laneCount] = {}
 
-			if location not in resultSet[algorithm]:
-				resultSet[algorithm][location] = {}
+				if roadLength not in resultSet[laneCount]:
+					resultSet[laneCount][roadLength] = {}
 
-			if beaconInterval not in resultSet[algorithm][location]:
-				resultSet[algorithm][location][beaconInterval] = {}
+				if algorithm not in resultSet[laneCount][roadLength]:
+					resultSet[laneCount][roadLength][algorithm] = {}
 
-			if initialFreshness not in resultSet[algorithm][location][beaconInterval]:
-				resultSet[algorithm][location][beaconInterval][initialFreshness] = {}
+				if beaconInterval not in resultSet[laneCount][roadLength][algorithm]:
+					resultSet[laneCount][roadLength][algorithm][beaconInterval] = {}
 
-			if freshnessThreshold not in resultSet[algorithm][location][beaconInterval][initialFreshness]:
-				resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold] = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [] }
+				if initialFreshness not in resultSet[laneCount][roadLength][algorithm][beaconInterval]:
+					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness] = {}
 
-			# Add them to the set
-			for metric in results:
-				# If this metric has not been added to this configuration, add it.
-				if metric not in resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold]:
-					resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
-				# Append the result to the list of metrics
-				resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
+				if freshnessThreshold not in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness]:
+					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
+
+				# Add them to the set
+				for metric in results:
+					# If this metric has not been added to this configuration, add it.
+					if metric not in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+						resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
+					# Append the result to the list of metrics
+					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
+
+			else:
+				# The location data is specified by the name of the map
+				if location not in resultSet:
+					resultSet[location] = {}
+
+				if roadLength not in resultSet[location]:
+					resultSet[location] = {}
+
+				if algorithm not in resultSet[location]:
+					resultSet[location][algorithm] = {}
+
+				if beaconInterval not in resultSet[location][algorithm]:
+					resultSet[location][algorithm][beaconInterval] = {}
+
+				if initialFreshness not in resultSet[location][algorithm][beaconInterval]:
+					resultSet[location][algorithm][beaconInterval][initialFreshness] = {}
+
+				if freshnessThreshold not in resultSet[location][algorithm][beaconInterval][initialFreshness]:
+					resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
+
+				# Add them to the set
+				for metric in results:
+					# If this metric has not been added to this configuration, add it.
+					if metric not in resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+						resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
+					# Append the result to the list of metrics
+					resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
 
 		# We've collected all the results, now we need to compute their means and stddevs
-		for algorithm in resultSet:
-			for location in resultSet[algorithm]:
-				for beaconInterval in resultSet[algorithm][location]:
-					for initialFreshness in resultSet[algorithm][location][beaconInterval]:
-						for freshnessThreshold in resultSet[algorithm][location][beaconInterval][initialFreshness]:
-							for metric in resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold]:
-								metricMean = numpy.mean( resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-								metricStd  =  numpy.std( resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-								metricMax  =  numpy.max( resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-								metricMin  =  numpy.min( resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-								resultSet[algorithm][location][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+		if options.doGrid:
+			for laneCount in resultSet:
+				for roadLength in resultSet[laneCount]:
+					for algorithm in resultSet[laneCount][roadLength]:
+						for beaconInterval in resultSet[laneCount][roadLength][algorithm]:
+							for initialFreshness in resultSet[laneCount][roadLength][algorithm][beaconInterval]:
+								for freshnessThreshold in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness]:
+									for metric in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+										metricMean = numpy.mean( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										metricStd  =  numpy.std( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										metricMax  =  numpy.max( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										metricMin  =  numpy.min( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+
+		else:
+			for location in resultSet:
+				for algorithm in resultSet[location]:
+					for beaconInterval in resultSet[location][algorithm]:
+						for initialFreshness in resultSet[location][algorithm][beaconInterval]:
+							for freshnessThreshold in resultSet[location][algorithm][beaconInterval][initialFreshness]:
+								for metric in resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+									metricMean = numpy.mean( resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+									metricStd  =  numpy.std( resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+									metricMax  =  numpy.max( resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+									metricMin  =  numpy.min( resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+									resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
 
 	# We've collated all the results. Attempt to dump this to a file.
 	with open(options.outputFile,"w") as f:

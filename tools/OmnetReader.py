@@ -246,11 +246,13 @@ class DataContainer:
 		return self.runList
 
 	def selectRun(self,runNumber):
+		loc = self.directory
 		if self.useTar:
 			subprocess.Popen( ['tar','-xf',self.directory+self.configName+'-'+str(runNumber)+'.tar.xz'] ).wait()
+			loc = "results"
 		hasError = False
 		try:
-			self.currentRun = Run(runNumber,self.configName,"results")
+			self.currentRun = Run(runNumber,self.configName,loc)
 		except ValueError:
 			hasError = True
 		if self.useTar:

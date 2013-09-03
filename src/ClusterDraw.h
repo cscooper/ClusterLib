@@ -77,6 +77,8 @@ protected:
     Coord mHalfViewDimensions;			/**< Coord containing half the width and height of the view. */
     double mHeight;						/**< Height of the camera above the playing field. */
 
+    bool mPrintStatus;					/**< Print the status of the camera. */
+    
     /** Print the position and height of the camera. */
     void printStatus();
 

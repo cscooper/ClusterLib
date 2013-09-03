@@ -20,6 +20,8 @@
 #include <algorithm>
 #include "ClusterTestScenarioManager.h"
 
+#include "ChannelAccess.h"
+
 #include "RmacControlMessage_m.h"
 #include "RmacNetworkLayer.h"
 
@@ -85,12 +87,14 @@ void ClusterTestScenarioManager::handleSelfMsg( cMessage *m ) {
 			b = ( colourCode - r - g ) / 100;
 			col = ClusterDraw::Colour( r, g, b );
 
+			Coord pos = mob->getCurrentPosition();
 			if ( isHead ) {
-				mDrawer->drawCircle( mob->getCurrentPosition(), 2, col, 3 );
-			} else {
-				Coord pos = mob->getCurrentPosition();
-				mDrawer->drawCircle( pos, 2, col );
 
+				mDrawer->drawCircle( pos, 2, col, 3 );
+
+			} else {
+
+				mDrawer->drawCircle( pos, 2, col );
                 ClusterAlgorithm *p = dynamic_cast<ClusterAlgorithm*>( cSimulation::getActiveSimulation()->getModule( mod->GetClusterHead() ) );
                 if ( p && p != mod ) {
                     float w;
@@ -106,6 +110,10 @@ void ClusterTestScenarioManager::handleSelfMsg( cMessage *m ) {
                 }
 
 			}
+
+// 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
+// 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
+// 			mDrawer->drawCircle( pos, radius, ClusterDraw::Colour(0,0,0) );
 
 		}
 		mDrawer->update( mFramePeriod );

@@ -71,11 +71,11 @@ void MdmacNetworkLayer::initialize(int stage)
 
     	// set up self-messages
     	mSendHelloMessage = new cMessage();
-    	scheduleAt( simTime() + mBeaconInterval, mSendHelloMessage );
+    	scheduleAt( simTime() + mBeaconInterval * float(rand()) / RAND_MAX, mSendHelloMessage );
     	mFirstInitMessage = new cMessage();
     	scheduleAt( simTime(), mFirstInitMessage );
     	mBeatMessage = new cMessage();
-    	scheduleAt( simTime() + BEAT_LENGTH, mBeatMessage );
+    	scheduleAt( simTime() + BEAT_LENGTH * float(rand()) / RAND_MAX, mBeatMessage );
 
     	// set up result connection
     	mSigOverhead = registerSignal( "sigOverhead" );

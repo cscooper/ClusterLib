@@ -43,8 +43,8 @@ simple ClusterTestScenarioManager
         double penetrationRate = default(1); //the probability of a vehicle being equipped with Car2X technology
 
 		// Graphics display stuff
-		double displayWidth = default(640);
-		double displayHeight = default(480);
+		double displayWidth = default(1280);
+		double displayHeight = default(960);
 		double framesPerSecond = default(1);
 		int playgroundSizeX @unit("m");
 		int playgroundSizeY @unit("m");

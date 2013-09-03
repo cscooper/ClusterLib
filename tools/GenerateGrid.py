@@ -33,20 +33,20 @@ launchdConfigFormat = """<?xml version="1.0"?>
 def parseOptions( argv ):
 	optParser = OptionParser()
 	optParser.add_option("-d",     "--directory",     dest="directory",          help="Define the maps directory.")
-	optParser.add_option("-L",      "--lane.min",      dest="minLanes",            help="Minimum number of lanes.",   default=1 )
-	optParser.add_option("-l",      "--lane.max",      dest="maxLanes",            help="Maximum number of lanes.",   default=4 )
-	optParser.add_option("-s",     "--lane.step",     dest="stepLanes",               help="Lane count increment.",   default=1 )
-	optParser.add_option("-E",      "--edge.min",      dest="minRoads",            help="Minimum length of roads.", default=100 )
-	optParser.add_option("-e",      "--edge.max",      dest="maxRoads",            help="Maximum length of roads.", default=400 )
-	optParser.add_option("-S",     "--edge.step",     dest="stepRoads",              help="Road length increment.", default=100 )
-	optParser.add_option("-J", "--junctionCount", dest="junctionCount",                help="Number of junctions.",   default=5 )
+	optParser.add_option("-L",      "--lane.min",      dest="minLanes",            help="Minimum number of lanes.", type = "int",   default=1 )
+	optParser.add_option("-l",      "--lane.max",      dest="maxLanes",            help="Maximum number of lanes.", type = "int",   default=4 )
+	optParser.add_option("-s",     "--lane.step",     dest="stepLanes",               help="Lane count increment.", type = "int",   default=1 )
+	optParser.add_option("-E",      "--edge.min",      dest="minRoads",            help="Minimum length of roads.", type = "int", default=100 )
+	optParser.add_option("-e",      "--edge.max",      dest="maxRoads",            help="Maximum length of roads.", type = "int", default=400 )
+	optParser.add_option("-S",     "--edge.step",     dest="stepRoads",              help="Road length increment.", type = "int", default=100 )
+	optParser.add_option("-J", "--junctionCount", dest="junctionCount",                help="Number of junctions.", type = "int",   default=5 )
 	optParser.add_option("-p",    "--cornerPath",    dest="cornerPath", help="Directory of the CORNER classifier." )
 	optParser.add_option("-c",   "--clusterPath",   dest="clusterPath",  help="Directory of the ClusterLib tools." )
 	optParser.add_option("-C",  "--cbdRoutePath",  dest="cbdRoutePath",    help="Directory of the CBDRouter tool." )
 	optParser.add_option("-V",  "--vehicleTypes",  dest="vehicleTypes",       help="Vehicle type definition file." )
-	optParser.add_option("-v",     "--carNumber", dest="vehicleNumber",     help="Number of vehicles to generate.", default=500 )
-	optParser.add_option("-R",  "--route-number",   dest="routeNumber",       help="Number of routes to generate.", default=250 )
-	optParser.add_option("-t",  "--maximum-time",       dest="maxTime",   help="The time limit of the simulation.", default=2000 )
+	optParser.add_option("-v",     "--carNumber", dest="vehicleNumber",     help="Number of vehicles to generate.", type = "int", default=500 )
+	optParser.add_option("-R",  "--route-number",   dest="routeNumber",       help="Number of routes to generate.", type = "int", default=250 )
+	optParser.add_option("-t",  "--maximum-time",       dest="maxTime",   help="The time limit of the simulation.", type = "int", default=2000 )
 	optParser.add_option("-D",    "--do-reverse",     dest="doReverse",     help="Create a reverse of each route.", default=False, action='store_true' )
 	(options, args) = optParser.parse_args(argv)
 
@@ -66,7 +66,7 @@ def generateGrids( options ):
 		for roadLength in range( options.minRoads, options.maxRoads+1, options.stepRoads ):
 			filename = "grid-" + str(options.junctionCount) + "x" + str(options.junctionCount) + "-" + str(laneCount) + "lane-" + str(roadLength) + "m"
 			print "Generating '" + filename + "'..."
-			p = subprocess.Popen( ['netgen','-g','--grid.number',str(options.junctionCount),'--grid.length',str(roadLength),'-L',str(laneCount),'--no-internal-links','-o',filename+".net.xml"] )
+			p = subprocess.Popen( ['netgen','-g','--grid.number',str(options.junctionCount),'--grid.length',str(roadLength),'-L',str(laneCount),'--no-internal-links','--tls.guess','-o',filename+".net.xml"] )
 			p.wait()
 
 			cbdFile = filename + '.cbd'
@@ -84,14 +84,14 @@ def analyseFiles( fileList, options ):
 	for f in fileList:
 		netFile = f+'.net.xml'
 		print "Running CORNER on '" + f + "'..."
-		p = subprocess.Popen( [options.cornerPath+'/Sumo2Corner.py','-n',netFile] )
+		p = subprocess.Popen( ['python',options.cornerPath+'/Sumo2Corner.py','-n',netFile] )
 		p.wait()
 		print "Running LSUF on '" + f + "'..."
-		p = subprocess.Popen( [options.clusterPath+'/LaneWeight.py','-n',netFile] )
+		p = subprocess.Popen( ['python',options.clusterPath+'/LaneWeight.py','-n',netFile] )
 		p.wait()
 		print "Generating route file..."
 		rouFile = f + ".rou.xml"
-		genCmd = [options.cbdRoutePath+'/CBDRouter.py']
+		genCmd = ['python',options.cbdRoutePath+'/CBDRouter.py']
 		genCmd += ['-n',netFile]
 		genCmd += ['-r',rouFile]
 		genCmd += ['-V',options.vehicleTypes]

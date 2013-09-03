@@ -38,6 +38,8 @@ ClusterDraw::ClusterDraw( Coord dims, Coord pgSize ) {
 
 	mTextFont = al_load_font( "ARIALUNI.TTF", 16, 0 );
 
+	mPrintStatus = false;
+
 }
 
 
@@ -131,6 +133,11 @@ void ClusterDraw::update( double elapsedTime ) {
 		heightChanged = true;
 	}
 
+	if ( al_key_down( &s, ALLEGRO_KEY_Q ) )
+		mPrintStatus = true;
+	else if ( al_key_down( &s, ALLEGRO_KEY_E ) )
+		mPrintStatus = false;
+	
 	if ( mHeight < 1 )
 		mHeight = 1;
 
@@ -202,7 +209,8 @@ void ClusterDraw::update( double elapsedTime ) {
 
 	}
 
-	printStatus();
+	if ( mPrintStatus )
+		printStatus();
 
 	al_flip_display();
 
