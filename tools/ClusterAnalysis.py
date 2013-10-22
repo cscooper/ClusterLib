@@ -2,8 +2,8 @@
 
 from VectorMath import *
 from optparse import OptionParser
-from matplotlib import pyplot
-import numpy, os, pickle, sys, time
+from matplotlib import pyplot,lines
+import numpy, os, pickle, sys, time, itertools
 from OmnetReader import DataContainer
 
 
@@ -15,9 +15,9 @@ from OmnetReader import DataContainer
 # Parse the options passed to the data compiler.
 def parseDataCompileOptions( argv ):
 	optParser = OptionParser()
-	optParser.add_option("-d", "--directory", dest="directory", help="Define the results directory.")
-	optParser.add_option("-t", "--useTar", dest="useTar", action="store_true", help="Define whether the individual runs are compressed into tar files.")
-	optParser.add_option("-g", "--doGrid", dest="doGrid", action="store_true", help="Only process the grid simulations. If false, grid simulations won't be processed.")
+	optParser.add_option("-d",  "--directory",  dest="directory", help="Define the results directory.")
+	optParser.add_option("-t",     "--useTar",     dest="useTar", help="Define whether the individual runs are compressed into tar files.", action="store_true")
+	optParser.add_option("-p",    "--process",    dest="process", help="Specify whether to process 'location', 'grid', or 'highway'.", type='string', default='location' )
 	optParser.add_option("-o", "--outputFile", dest="outputFile", help="Specify the output file")
 	(options, args) = optParser.parse_args(argv)
 
@@ -115,11 +115,16 @@ def dataCompile( argv ):
 		runList = sorted(dataContainers[config].getRunList())
 		print "Found " + str(len(runList)) + " runs for " + config + "."
 
-		if ("grid" in config) != (options.doGrid):
-			if options.doGrid:
+		if ( ( "grid" in config ) != ( options.process == 'grid' ) ) or ( ( "highway" in config ) != ( options.process == 'highway' ) ):
+			if options.process == 'grid':
 				print "We've been asked to only process grid sims, and " + config + " is not one. Skipping."
+			elif options.process == 'highway':
+				print "We've been asked to only process highway sims, and " + config + " is not one. Skipping."
+			elif options.process == 'location':
+				print "We've been asked to only process location sims, and " + config + " is not one. Skipping."
 			else:
-				print "We've been asked to not process grid sims, and " + config + " is one. Skipping."
+				print "Invalid process identifier '" + options.process + "'"
+				sys.exit(-1)
 			continue
 
 		# Iterate through the runs
@@ -135,10 +140,15 @@ def dataCompile( argv ):
 			# Get the parameters of this run
 			runAttributes = dataContainers[config].getRunAttributes()
 			algorithm = runAttributes['networkType']
-			if options.doGrid:
+			if options.process == 'grid':
 				laneCount = int(runAttributes['laneCount'])
 				roadLength = int(runAttributes['roadLength'])
-			else:
+			elif options.process == 'highway':
+				laneCount = int(runAttributes['laneCount'])
+				roadLength = int(runAttributes['roadLength'])
+				speed = float(runAttributes['speed'])
+				nodeDensity = float(runAttributes['cpd'])
+			elif options.process == 'location':
 				location = runAttributes['launchCfg'].lstrip('xmldoc(\\"maps').rstrip('.launchd.xml\\")').lstrip('/')
 			beaconInterval = float(runAttributes['beacon'])
 			initialFreshness = float(runAttributes['initFreshness'])
@@ -147,7 +157,7 @@ def dataCompile( argv ):
 			# Collect the results for this run.
 			results = collectResults( dataContainers[config] )
 
-			if options.doGrid:
+			if options.process == 'grid':
 				# The location data is specified by the lane count and the road length.
 				if laneCount not in resultSet:
 					resultSet[laneCount] = {}
@@ -175,7 +185,41 @@ def dataCompile( argv ):
 					# Append the result to the list of metrics
 					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
 
-			else:
+			elif options.process == 'highway':
+				# The location data is specified by the lane count, the road length, speed, and node density.
+				if laneCount not in resultSet:
+					resultSet[laneCount] = {}
+
+				if roadLength not in resultSet[laneCount]:
+					resultSet[laneCount][roadLength] = {}
+
+				if speed not in resultSet[laneCount][roadLength]:
+					resultSet[laneCount][roadLength][speed] = {}
+
+				if nodeDensity not in resultSet[laneCount][roadLength][speed]:
+					resultSet[laneCount][roadLength][speed][nodeDensity] = {}
+
+				if algorithm not in resultSet[laneCount][roadLength][speed][nodeDensity]:
+					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm] = {}
+
+				if beaconInterval not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm]:
+					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval] = {}
+
+				if initialFreshness not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval]:
+					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness] = {}
+
+				if freshnessThreshold not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness]:
+					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
+
+				# Add them to the set
+				for metric in results:
+					# If this metric has not been added to this configuration, add it.
+					if metric not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+						resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
+					# Append the result to the list of metrics
+					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
+
+			elif options.process == 'location':
 				# The location data is specified by the name of the map
 				if location not in resultSet:
 					resultSet[location] = {}
@@ -204,7 +248,7 @@ def dataCompile( argv ):
 					resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
 
 		# We've collected all the results, now we need to compute their means and stddevs
-		if options.doGrid:
+		if options.process == 'grid':
 			for laneCount in resultSet:
 				for roadLength in resultSet[laneCount]:
 					for algorithm in resultSet[laneCount][roadLength]:
@@ -218,7 +262,23 @@ def dataCompile( argv ):
 										metricMin  =  numpy.min( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
 										resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
 
-		else:
+		elif options.process == 'highway':
+			for laneCount in resultSet:
+				for roadLength in resultSet[laneCount]:
+					for speed in resultSet[laneCount][roadLength]:
+						for nodeDensity in resultSet[laneCount][roadLength][speed]:
+							for algorithm in resultSet[laneCount][roadLength][speed][nodeDensity]:
+								for beaconInterval in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm]:
+									for initialFreshness in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval]:
+										for freshnessThreshold in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness]:
+											for metric in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+												metricMean = numpy.mean( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												metricStd  =  numpy.std( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												metricMax  =  numpy.max( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												metricMin  =  numpy.min( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+
+		elif options.process == 'location':
 			for location in resultSet:
 				for algorithm in resultSet[location]:
 					for beaconInterval in resultSet[location][algorithm]:
@@ -230,6 +290,15 @@ def dataCompile( argv ):
 									metricMax  =  numpy.max( resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
 									metricMin  =  numpy.min( resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
 									resultSet[location][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+
+	resultSet['settings'] = {}
+	resultSet['settings']['process'] = options.process
+	if options.process == 'grid':
+		resultSet['settings']['precidence'] = ['Lane Count','Road Length','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
+	elif options.process == 'highway':
+		resultSet['settings']['precidence'] = ['Lane Count','Road Length','Speed','Node Density','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
+	elif options.process == 'location':
+		resultSet['settings']['precidence'] = ['Location','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
 
 	# We've collated all the results. Attempt to dump this to a file.
 	with open(options.outputFile,"w") as f:
@@ -273,7 +342,7 @@ def parseDataAnalyseOptions( argv ):
 def doSelection( message, selections ):
 	print message
 	for i in range(0,len(selections)):
-		print str(i) + ".) " + selections[i]
+		print str(i) + ".) " + str( selections[i] )
 	print str(len(selections)) + ".) Quit"
 
 	sels = []
@@ -296,31 +365,26 @@ def doSelection( message, selections ):
 	return retSel
 
 
-# Analyse the data
-def dataAnalyse( argv ):
-	options = parseDataAnalyseOptions( argv )
 
-	try:
-		with open( options.dataFile, "r" ) as f:
-			resultData = pickle.load( f )
-	except Exception as e:
-		print str(e)
-		sys.exit(0)
+def locationAnalyse( resultData ):
 
-	# We have the data, now let's get to analysing it.
+	if 'settings' in resultData.keys():
+		precidence = resultData['settings']['precidence']
+		resultData.pop('settings',None)
+
 	while True:
-		# Pick an algorithm
-		algorithm = doSelection( "Algorithms:", resultData.keys() )
-		if not algorithm:
-			break
-
 		# Pick a location (NOTE THIS ASSUMES THE LOCATIONS ARE THE SAME REGARDLESS OF THE ALGORITHM IN USE!)
 		location = []
 		while len(location) != 1:
-			location = doSelection( "Locations (Choose one!):", resultData[algorithm[0]].keys() )
+			location = doSelection( "Locations (Choose one!):", resultData.keys() )
 			if not location:
 				break
 		location = location[0]
+
+		# Pick an algorithm
+		algorithm = doSelection( "Algorithms:", resultData[location].keys() )
+		if not algorithm:
+			break
 
 		# Now we go through the parameters one by one.
 		# We pick the value we want to use at each point, but at least one of the variables 
@@ -328,7 +392,7 @@ def dataAnalyse( argv ):
 		xAxis = None
 
 		# Start with beacon interval
-		beaconIntervals = sorted( resultData[algorithm[0]][location].keys(), key=lambda x: float(x) )
+		beaconIntervals = sorted( resultData[location][algorithm[0]].keys(), key=lambda x: float(x) )
 		beaconInterval = doSelection( "Beacon Interval:", beaconIntervals + ["Use as x-axis"] )
 		if not beaconInterval:
 			break
@@ -338,7 +402,7 @@ def dataAnalyse( argv ):
 			beaconInterval = beaconIntervals[0]
 
 		# Now go onto Initial Freshness
-		initFreshnesses = sorted( resultData[algorithm[0]][location][beaconInterval].keys(), key=lambda x: float(x) )
+		initFreshnesses = sorted( resultData[location][algorithm[0]][beaconInterval].keys(), key=lambda x: float(x) )
 		initialFreshness = None
 		while True:
 			initialFreshness = doSelection( "Initial Freshness:", initFreshnesses + ["Use as x-axis"] )
@@ -357,7 +421,7 @@ def dataAnalyse( argv ):
 			break
 
 		# Now go to Freshness Threshold
-		freshnessThresholds = sorted( resultData[algorithm[0]][location][beaconInterval][initialFreshness].keys(), key=lambda x: float(x) )
+		freshnessThresholds = sorted( resultData[location][algorithm[0]][beaconInterval][initialFreshness].keys(), key=lambda x: float(x) )
 		freshnessThreshold = None
 		while True:
 			freshnessThreshold = doSelection( "Freshness Threshold:", freshnessThresholds + ["Use as x-axis"] )
@@ -382,7 +446,7 @@ def dataAnalyse( argv ):
 		while True:
 			# Now pick a metric:
 			metrics = None
-			metrics = doSelection( "Metric:", sorted(resultData[algorithm[0]][location][beaconInterval][initialFreshness][freshnessThreshold].keys()) )
+			metrics = doSelection( "Metric:", sorted(resultData[location][algorithm[0]][beaconInterval][initialFreshness][freshnessThreshold].keys()) )
 			if not metrics:
 				break
 
@@ -395,20 +459,20 @@ def dataAnalyse( argv ):
 					yAxisVals = []
 					yAxisError = []
 					if xAxis == "Beacon Interval":
-						for v in sorted( resultData[al][location].keys(), key = lambda x: float(x) ):
+						for v in sorted( resultData[location][al].keys(), key = lambda x: float(x) ):
 							xAxisVals.append( float(v) )
-							yAxisVals.append( resultData[al][location][v][initialFreshness][freshnessThreshold][metric][0] )
-							yAxisError.append( resultData[al][location][v][initialFreshness][freshnessThreshold][metric][1] )
+							yAxisVals.append( resultData[location][al][v][initialFreshness][freshnessThreshold][metric][0] )
+							yAxisError.append( resultData[location][al][v][initialFreshness][freshnessThreshold][metric][1] )
 					elif xAxis == "Initial Freshness":
-						for v in sorted( resultData[al][location][beaconInterval].keys(), key = lambda x: float(x) ):
+						for v in sorted( resultData[location][al][beaconInterval].keys(), key = lambda x: float(x) ):
 							xAxisVals.append( float(v) )
-							yAxisVals.append( resultData[al][location][beaconInterval][v][freshnessThreshold][metric][0] )
-							yAxisError.append( resultData[al][location][beaconInterval][v][freshnessThreshold][metric][1] )
+							yAxisVals.append( resultData[location][al][beaconInterval][v][freshnessThreshold][metric][0] )
+							yAxisError.append( resultData[location][al][beaconInterval][v][freshnessThreshold][metric][1] )
 					elif xAxis == "Freshness Threshold":
-						for v in sorted( resultData[al][location][beaconInterval][initialFreshness].keys(), key = lambda x: float(x) ):
+						for v in sorted( resultData[location][al][beaconInterval][initialFreshness].keys(), key = lambda x: float(x) ):
 							xAxisVals.append( float(v) )
-							yAxisVals.append( resultData[al][location][beaconInterval][initialFreshness][v][metric][0] )
-							yAxisError.append( resultData[al][location][beaconInterval][initialFreshness][v][metric][1] )
+							yAxisVals.append( resultData[location][al][beaconInterval][initialFreshness][v][metric][0] )
+							yAxisError.append( resultData[location][al][beaconInterval][initialFreshness][v][metric][1] )
 
 					pyplot.errorbar( xAxisVals, yAxisVals, yerr = yAxisError, label=al )
 					pyplot.xlim( [0,max(xAxisVals)+0.1] )
@@ -440,6 +504,241 @@ def dataAnalyse( argv ):
 					pyplot.show()
 					if raw_input( "Do you want to try a different metric? (Y/n) " ).lower() == 'n':
 						break
+
+
+
+def gridAnalyse(resultData):
+	if 'settings' in resultData.keys():
+		precidence = resultData['settings']['precidence']
+		resultData.pop('settings',None)
+
+	def acquireData( dat, axis, precidence, **kwargs ):
+		hVals = []
+		vVals = []
+		loc = precidence.index(axis)
+		if loc == 0:
+			hVals = sorted( dat.keys() )
+			vVals = [ dat[val][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs['metric']] for val in hVals ]
+		elif loc == 1:
+			hVals = sorted( dat[kwargs[precidence[0]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][val][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs['metric']] for val in hVals ]
+		elif loc == 2:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][val][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs['metric']] for val in hVals ]
+		elif loc == 3:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][val][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs['metric']] for val in hVals ]
+		elif loc == 4:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][val][kwargs[precidence[5]]][kwargs['metric']] for val in hVals ]
+		elif loc == 5:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][val][kwargs['metric']] for val in hVals ]
+		return (hVals,vVals)
+
+	markers = list(lines.Line2D.markers.keys())[5:] 
+
+	while True:
+		# Analyse grid 
+		res = {}
+		setAxes = []
+
+		endThis = False
+		xAxis = None
+		currVals = resultData
+		for n in precidence:
+			res[n] = doSelection( 'Select a ' + n + ':', sorted(currVals.keys()) + ['Use as axis'] )
+			if not res[n]:
+				endThis = True
+				break
+			nextN = res[n][0]
+			if nextN == 'Use as axis':
+				res[n] = sorted(currVals.keys())
+			nextN = res[n][0]
+			if len(res[n]) > 1:
+				setAxes.append(n)
+				nextN = res[n][0]
+				strMsg = "Use as horizontal axis"
+				if xAxis:
+					strMsg += " (Current: " + xAxis + ")"
+				strMsg += "?"
+				if raw_input( strMsg ).lower() == "y":
+					xAxis = n
+			currVals = currVals[nextN]
+
+		if endThis:
+			break
+
+		permutations = list( itertools.product(*[ res[n] for n in precidence if n is not xAxis ]) )
+		kwargSet = [dict( zip( [a for a in precidence if a is not xAxis], p ) ) for p in permutations]
+
+		while True:
+			# Now pick a metric:
+			metrics = None
+			metrics = doSelection( "Metric:", sorted(currVals) )
+			if not metrics:
+				break
+
+			markerIndex = 0
+			# Get the data
+			for kw in kwargSet:
+				conf = kw;
+				conf['metric'] = metrics[0]
+				hVals,vVals = acquireData( resultData, xAxis, precidence, **conf )
+				labelStr = ""
+				s = False
+				for k in kw:
+					if k in setAxes and k is not xAxis:
+						if s:
+							labelStr += "; "
+						labelStr += k + "=" + str(kw[k])
+						s = True
+				v = [val[0] for val in vVals]
+				pyplot.plot( hVals, v, label=labelStr, marker=markers[markerIndex] )
+				markerIndex+=1
+				if markerIndex == len(markers):
+					markerIndex = 0
+			pyplot.legend(loc='best')
+			pyplot.title( metrics[0] + " vs. " + xAxis )
+			pyplot.xlabel( xAxis )
+			pyplot.ylabel( metrics[0] )
+			pyplot.show()
+
+
+
+def highwayAnalyse(resultData):
+	if 'settings' in resultData.keys():
+		precidence = resultData['settings']['precidence']
+		resultData.pop('settings',None)
+
+	def acquireData( dat, axis, precidence, **kwargs ):
+		hVals = []
+		vVals = []
+		loc = precidence.index(axis)
+		if loc == 0:
+			hVals = sorted( dat.keys() )
+			vVals = [ dat[val][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 1:
+			hVals = sorted( dat[kwargs[precidence[0]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][val][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 2:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][val][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 3:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][val][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 4:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][val][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 5:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][val][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 6:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[6]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][val][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+		elif loc == 7:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[6]]][kwargs[precidence[7]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][val][kwargs['metric']] for val in hVals ]
+		return (hVals,vVals)
+
+	markers = list(lines.Line2D.markers.keys())[5:] 
+
+	while True:
+		# Analyse grid 
+		res = {}
+		setAxes = []
+
+		endThis = False
+		xAxis = None
+		currVals = resultData
+		for n in precidence:
+			res[n] = doSelection( 'Select a ' + n + ':', sorted(currVals.keys()) + ['Use as axis'] )
+			if not res[n]:
+				endThis = True
+				break
+			nextN = res[n][0]
+			if nextN == 'Use as axis':
+				res[n] = sorted(currVals.keys())
+			nextN = res[n][0]
+			if len(res[n]) > 1:
+				setAxes.append(n)
+				nextN = res[n][0]
+				strMsg = "Use as horizontal axis"
+				if xAxis:
+					strMsg += " (Current: " + xAxis + ")"
+				strMsg += "?"
+				if raw_input( strMsg ).lower() == "y":
+					xAxis = n
+			currVals = currVals[nextN]
+
+		if endThis:
+			break
+
+		permutations = list( itertools.product(*[ res[n] for n in precidence if n is not xAxis ]) )
+		kwargSet = [dict( zip( [a for a in precidence if a is not xAxis], p ) ) for p in permutations]
+
+		while True:
+			# Now pick a metric:
+			metrics = None
+			metrics = doSelection( "Metric:", sorted(currVals) )
+			if not metrics:
+				break
+
+			markerIndex = 0
+			# Get the data
+			for kw in kwargSet:
+				conf = kw;
+				conf['metric'] = metrics[0]
+				try:
+					hVals,vVals = acquireData( resultData, xAxis, precidence, **conf )
+				except KeyError:
+					print "Skipping " + str(conf)
+					continue
+				labelStr = ""
+				s = False
+				for k in kw:
+					if k in setAxes and k is not xAxis:
+						if s:
+							labelStr += "; "
+						labelStr += k + "=" + str(kw[k])
+						s = True
+				v = [val[0] for val in vVals]
+				pyplot.plot( hVals, v, label=labelStr, marker=markers[markerIndex] )
+				markerIndex+=1
+				if markerIndex == len(markers):
+					markerIndex = 0
+			pyplot.legend(loc='best')
+			pyplot.title( metrics[0] + " vs. " + xAxis )
+			pyplot.xlabel( xAxis )
+			pyplot.ylabel( metrics[0] )
+			pyplot.show()
+
+
+# Analyse the data
+def dataAnalyse( argv ):
+	options = parseDataAnalyseOptions( argv )
+
+	try:
+		with open( options.dataFile, "r" ) as f:
+			resultData = pickle.load( f )
+	except Exception as e:
+		print str(e)
+		sys.exit(0)
+
+	if 'settings' in resultData.keys():
+		process = resultData['settings']['process']
+	else:
+		process = 'location'
+
+	# We have the data, now let's get to analysing it.
+	if process == 'grid':
+		gridAnalyse(resultData)
+	elif process == 'highway':
+		highwayAnalyse(resultData)
+	elif process == 'location':
+		locationAnalyse(resultData)
+	else:
+		print "Unknown process identifier '" + process + "'"
 
 	print "Good bye!"
 

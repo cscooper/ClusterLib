@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for libClusterLib
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep --make-so -I/media/Data/PhD/simulations/ClusterLib/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L/media/Data/PhD/simulations/ClusterLib/URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
+#  opp_makemake -f --deep --make-so -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
 #
 
 # Name of target to be created (-o option)
@@ -10,7 +10,6 @@ TARGET = libClusterLib$(SHARED_LIB_SUFFIX)
 
 # C++ include paths (with -I)
 INCLUDE_PATH = \
-    -I../URAE/include \
     -I../../veins-2.0/src/base/utils \
     -I../../veins-2.0/src/modules \
     -I../../veins-2.0/src/base/phyLayer \
@@ -24,8 +23,8 @@ INCLUDE_PATH = \
 EXTRA_OBJS =
 
 # Additional libraries (-L, -l options)
-LIBS = -L../URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base  -lmiximtestUtils -lmiximmodules -lmiximbase
-LIBS += -Wl,-rpath,`abspath ../URAE/lib` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/modules` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/base`
+LIBS = -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base  -lmiximtestUtils -lmiximmodules -lmiximbase
+LIBS += -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/modules` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/base`
 
 # Output directory
 PROJECT_OUTPUT_DIR = ../out
@@ -34,22 +33,22 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
-    $O/ClusterDraw.o \
-    $O/LSUFCluster.o \
-    $O/LSUFData.o \
-    $O/MdmacNetworkLayer.o \
-    $O/RmacNetworkLayer.o \
-    $O/ClusterTestScenarioManager.o \
     $O/HighestDegreeCluster.o \
-    $O/LowestIdCluster.o \
+    $O/ClusterTestScenarioManager.o \
     $O/ClusterAlgorithm.o \
-    $O/MdmacControlMessage_m.o \
-    $O/RmacControlMessage_m.o
+    $O/RmacNetworkLayer.o \
+    $O/LSUFData.o \
+    $O/LowestIdCluster.o \
+    $O/LSUFCluster.o \
+    $O/ClusterDraw.o \
+    $O/MdmacNetworkLayer.o \
+    $O/RmacControlMessage_m.o \
+    $O/MdmacControlMessage_m.o
 
 # Message files
 MSGFILES = \
-    MdmacControlMessage.msg \
-    RmacControlMessage.msg
+    RmacControlMessage.msg \
+    MdmacControlMessage.msg
 
 # Other makefile variables (-K)
 VEINS_2_0_PROJ=../../veins-2.0
@@ -105,7 +104,7 @@ $(TARGET) : $O/$(TARGET)
 
 $O/$(TARGET): $(OBJS)  $(wildcard $(EXTRA_OBJS)) Makefile
 	@$(MKPATH) $O
-	$(SHLIB_LD) -o $O/$(TARGET)  $(OBJS) $(EXTRA_OBJS) $(AS_NEEDED_OFF) $(WHOLE_ARCHIVE_ON) $(LIBS) $(WHOLE_ARCHIVE_OFF) $(OMNETPP_LIBS) $(LDFLAGS)
+	$(SHLIB_LD) -o $O/$(TARGET)  $(OBJS) $(EXTRA_OBJS) $(LIBS) $(OMNETPP_LIBS) $(LDFLAGS)
 	$(SHLIB_POSTPROCESS) $O/$(TARGET)
 
 .PHONY:
@@ -170,6 +169,7 @@ $O/ClusterTestScenarioManager.o: ClusterTestScenarioManager.cc \
 	RmacControlMessage_m.h \
 	RmacNetworkLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
+	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
 	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
