@@ -111,9 +111,9 @@ void ClusterTestScenarioManager::handleSelfMsg( cMessage *m ) {
 
 			}
 
-// 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
-// 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
-// 			mDrawer->drawCircle( pos, radius, ClusterDraw::Colour(0,0,0) );
+ 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
+ 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
+ 			mDrawer->drawCircle( pos, radius, ClusterDraw::Colour(0,0,0) );
 
 		}
 		mDrawer->update( mFramePeriod );

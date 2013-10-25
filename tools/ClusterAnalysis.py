@@ -7,6 +7,12 @@ import numpy, os, pickle, sys, time, itertools
 from OmnetReader import DataContainer
 
 
+
+metricPresentation = { "overhead" : "Overhead", "helloOverhead" : "Hello Overhead", "clusterLifetime" : "Cluster Lifetime" , "clusterSize" : "Cluster Size", "headChange" : "Reaffiliation" }
+metricUnits = { "overhead" : "B", "helloOverhead" : "B", "clusterLifetime" : "s", "clusterSize" : None, "headChange" : None }
+metricMultiplier = { "overhead" : 1, "helloOverhead" : 1, "clusterLifetime" : 1 , "clusterSize" : 1, "headChange" : 1 }
+
+
 ##################
 # DATA COMPILING #
 ##################
@@ -48,6 +54,9 @@ def enumerateConfigs( directoryName, useTar ):
 # Collect the results from the given data container.
 def collectResults( dataContainer ):
 	results = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [] }
+	counts = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0 }
+	minima = { "overhead" : numpy.inf, "helloOverhead" : numpy.inf, "clusterLifetime" : numpy.inf, "clusterSize" : numpy.inf, "headChange" : numpy.inf }
+	maxima = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0 }
 
 	# Get the list of scalars
 	scalarList = dataContainer.getScalarList()
@@ -67,6 +76,9 @@ def collectResults( dataContainer ):
 			continue
 
 		results[resName].append( scalar.value )
+		counts[resName] += 1
+		minima[resName] = min( minima[resName], scalar.value )
+		maxima[resName] = max( maxima[resName], scalar.value )
 
 	# Get the list of statistics
 	statisticsList = dataContainer.getStatisticsList()
@@ -82,22 +94,24 @@ def collectResults( dataContainer ):
 			continue
 
 		stat = dataContainer.getStatistic( moduleName, statName )
-		if 'count' not in stat.fields or 'sum' not in stat.fields or 'mean' not in stat.fields:
+		if 'count' not in stat.fields or 'sum' not in stat.fields or 'max' not in stat.fields or 'min' not in stat.fields:
 			continue
 
 		if stat.fields['count'] == 0:
 			continue
 
-		if resName == 'overhead' or resName == 'helloOverhead':
-			results[resName].append( stat.fields['sum'] )
-		else:
-			results[resName].append( stat.fields['mean'] )
+		results[resName].append( stat.fields['sum'] )
+		counts[resName] += stat.fields['count']
+		minima[resName] = min( minima[resName], stat.fields['min'] )
+		maxima[resName] = max( maxima[resName], stat.fields['max'] )
 
 	colatedResults = {}
 	for key in results.iterkeys():
-		colatedResults[key + " Mean"] = numpy.mean( results[key] )
-		colatedResults[key +  " Max"] = max( results[key] )
-		colatedResults[key +  " Min"] = min( results[key] )
+		colatedResults["Mean "    + metricPresentation[key]] = numpy.sum( results[key] ) / counts[key]
+		colatedResults["Maximum " + metricPresentation[key]] = maxima[key]
+		colatedResults["Minimum " + metricPresentation[key]] = minima[key]
+		colatedResults["Total "   + metricPresentation[key]] = numpy.sum( results[key] )
+		colatedResults[metricPresentation[key] + " Rate"] = numpy.sum( results[key] ) / 1800
 
 	return colatedResults
 
@@ -142,12 +156,12 @@ def dataCompile( argv ):
 			algorithm = runAttributes['networkType']
 			if options.process == 'grid':
 				laneCount = int(runAttributes['laneCount'])
-				roadLength = int(runAttributes['roadLength'])
+				junctionCount = int(runAttributes['junctionCount'])
 			elif options.process == 'highway':
 				laneCount = int(runAttributes['laneCount'])
-				roadLength = int(runAttributes['roadLength'])
+				junctionCount = int(runAttributes['junctionCount'])
 				speed = float(runAttributes['speed'])
-				nodeDensity = float(runAttributes['cpd'])
+				carDensity = float(runAttributes['cars'])
 			elif options.process == 'location':
 				location = runAttributes['launchCfg'].lstrip('xmldoc(\\"maps').rstrip('.launchd.xml\\")').lstrip('/')
 			beaconInterval = float(runAttributes['beacon'])
@@ -162,69 +176,69 @@ def dataCompile( argv ):
 				if laneCount not in resultSet:
 					resultSet[laneCount] = {}
 
-				if roadLength not in resultSet[laneCount]:
-					resultSet[laneCount][roadLength] = {}
+				if junctionCount not in resultSet[laneCount]:
+					resultSet[laneCount][junctionCount] = {}
 
-				if algorithm not in resultSet[laneCount][roadLength]:
-					resultSet[laneCount][roadLength][algorithm] = {}
+				if algorithm not in resultSet[laneCount][junctionCount]:
+					resultSet[laneCount][junctionCount][algorithm] = {}
 
-				if beaconInterval not in resultSet[laneCount][roadLength][algorithm]:
-					resultSet[laneCount][roadLength][algorithm][beaconInterval] = {}
+				if beaconInterval not in resultSet[laneCount][junctionCount][algorithm]:
+					resultSet[laneCount][junctionCount][algorithm][beaconInterval] = {}
 
-				if initialFreshness not in resultSet[laneCount][roadLength][algorithm][beaconInterval]:
-					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness] = {}
+				if initialFreshness not in resultSet[laneCount][junctionCount][algorithm][beaconInterval]:
+					resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness] = {}
 
-				if freshnessThreshold not in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness]:
-					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
+				if freshnessThreshold not in resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness]:
+					resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
 
 				# Add them to the set
 				for metric in results:
 					# If this metric has not been added to this configuration, add it.
-					if metric not in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
-						resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
+					if metric not in resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+						resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
 					# Append the result to the list of metrics
-					resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
+					resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
 
 			elif options.process == 'highway':
 				# The location data is specified by the lane count, the road length, speed, and node density.
 				if laneCount not in resultSet:
 					resultSet[laneCount] = {}
 
-				if roadLength not in resultSet[laneCount]:
-					resultSet[laneCount][roadLength] = {}
+				if junctionCount not in resultSet[laneCount]:
+					resultSet[laneCount][junctionCount] = {}
 
-				if speed not in resultSet[laneCount][roadLength]:
-					resultSet[laneCount][roadLength][speed] = {}
+				if speed not in resultSet[laneCount][junctionCount]:
+					resultSet[laneCount][junctionCount][speed] = {}
 
-				if nodeDensity not in resultSet[laneCount][roadLength][speed]:
-					resultSet[laneCount][roadLength][speed][nodeDensity] = {}
+				if carDensity not in resultSet[laneCount][junctionCount][speed]:
+					resultSet[laneCount][junctionCount][speed][carDensity] = {}
 
-				if algorithm not in resultSet[laneCount][roadLength][speed][nodeDensity]:
-					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm] = {}
+				if algorithm not in resultSet[laneCount][junctionCount][speed][carDensity]:
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm] = {}
 
-				if beaconInterval not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm]:
-					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval] = {}
+				if beaconInterval not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm]:
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval] = {}
 
-				if initialFreshness not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval]:
-					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness] = {}
+				if initialFreshness not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval]:
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness] = {}
 
-				if freshnessThreshold not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness]:
-					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
+				if freshnessThreshold not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness]:
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
 
 				# Add them to the set
 				for metric in results:
 					# If this metric has not been added to this configuration, add it.
-					if metric not in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
-						resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
+					if metric not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+						resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
 					# Append the result to the list of metrics
-					resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
 
 			elif options.process == 'location':
 				# The location data is specified by the name of the map
 				if location not in resultSet:
 					resultSet[location] = {}
 
-				if roadLength not in resultSet[location]:
+				if junctionCount not in resultSet[location]:
 					resultSet[location] = {}
 
 				if algorithm not in resultSet[location]:
@@ -250,33 +264,33 @@ def dataCompile( argv ):
 		# We've collected all the results, now we need to compute their means and stddevs
 		if options.process == 'grid':
 			for laneCount in resultSet:
-				for roadLength in resultSet[laneCount]:
-					for algorithm in resultSet[laneCount][roadLength]:
-						for beaconInterval in resultSet[laneCount][roadLength][algorithm]:
-							for initialFreshness in resultSet[laneCount][roadLength][algorithm][beaconInterval]:
-								for freshnessThreshold in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness]:
-									for metric in resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
-										metricMean = numpy.mean( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-										metricStd  =  numpy.std( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-										metricMax  =  numpy.max( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-										metricMin  =  numpy.min( resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-										resultSet[laneCount][roadLength][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+				for junctionCount in resultSet[laneCount]:
+					for algorithm in resultSet[laneCount][junctionCount]:
+						for beaconInterval in resultSet[laneCount][junctionCount][algorithm]:
+							for initialFreshness in resultSet[laneCount][junctionCount][algorithm][beaconInterval]:
+								for freshnessThreshold in resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness]:
+									for metric in resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+										metricMean = numpy.mean( resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										metricStd  =  numpy.std( resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										metricMax  =  numpy.max( resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										metricMin  =  numpy.min( resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+										resultSet[laneCount][junctionCount][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
 
 		elif options.process == 'highway':
 			for laneCount in resultSet:
-				for roadLength in resultSet[laneCount]:
-					for speed in resultSet[laneCount][roadLength]:
-						for nodeDensity in resultSet[laneCount][roadLength][speed]:
-							for algorithm in resultSet[laneCount][roadLength][speed][nodeDensity]:
-								for beaconInterval in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm]:
-									for initialFreshness in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval]:
-										for freshnessThreshold in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness]:
-											for metric in resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
-												metricMean = numpy.mean( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												metricStd  =  numpy.std( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												metricMax  =  numpy.max( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												metricMin  =  numpy.min( resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												resultSet[laneCount][roadLength][speed][nodeDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+				for junctionCount in resultSet[laneCount]:
+					for speed in resultSet[laneCount][junctionCount]:
+						for carDensity in resultSet[laneCount][junctionCount][speed]:
+							for algorithm in resultSet[laneCount][junctionCount][speed][carDensity]:
+								for beaconInterval in resultSet[laneCount][junctionCount][speed][carDensity][algorithm]:
+									for initialFreshness in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval]:
+										for freshnessThreshold in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness]:
+											for metric in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+												metricMean = numpy.mean( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												metricStd  =  numpy.std( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												metricMax  =  numpy.max( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												metricMin  =  numpy.min( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
+												resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
 
 		elif options.process == 'location':
 			for location in resultSet:
@@ -294,9 +308,9 @@ def dataCompile( argv ):
 	resultSet['settings'] = {}
 	resultSet['settings']['process'] = options.process
 	if options.process == 'grid':
-		resultSet['settings']['precidence'] = ['Lane Count','Road Length','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
+		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
 	elif options.process == 'highway':
-		resultSet['settings']['precidence'] = ['Lane Count','Road Length','Speed','Node Density','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
+		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Speed','Node Density','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
 	elif options.process == 'location':
 		resultSet['settings']['precidence'] = ['Location','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
 
@@ -322,9 +336,6 @@ def dataCompile( argv ):
 #################
 
 
-metricPresentation = { "overhead" : "Overhead", "helloOverhead" : "Hello Overhead", "clusterLifetime" : "Cluster Lifetime" , "clusterSize" : "Cluster Size", "headChange" : "Head Change" }
-metricUnits = { "overhead" : "B", "helloOverhead" : "B", "clusterLifetime" : "s", "clusterSize" : None, "headChange" : None }
-metricMultiplier = { "overhead" : 1, "helloOverhead" : 1, "clusterLifetime" : 1 , "clusterSize" : 1, "headChange" : 1 }
 
 # Parse the options passed to the data analyser.
 def parseDataAnalyseOptions( argv ):

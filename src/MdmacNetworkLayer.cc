@@ -58,6 +58,7 @@ void MdmacNetworkLayer::initialize(int stage)
     	mClusterHead = -1;
     	mIsClusterHead = false;
     	mCurrentMaximumClusterSize = 0;
+    	mClusterStartTime = 0;
 
     	ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(findHost());
     	mTransmitRangeSq = pow( channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance(), 2 );
@@ -412,7 +413,7 @@ int MdmacNetworkLayer::chooseClusterHead() {
 void MdmacNetworkLayer::linkFailure( unsigned int nodeId ) {
 
 	mNeighbours.erase( nodeId );
-	if ( mIsClusterHead ) {
+	if ( IsClusterHead() ) {
 
 		if ( mClusterMembers.find( nodeId ) == mClusterMembers.end() )
 			return;		// we don't need to do anything, because it wasn't a member of our cluster.
@@ -422,7 +423,6 @@ void MdmacNetworkLayer::linkFailure( unsigned int nodeId ) {
 		 *  and emit the cluster size change signal.
 		 */
 		mClusterMembers.erase( nodeId );
-		emit( mSigClusterSize, mClusterMembers.size() );
 
 		// also check if we've lost all our CMs
 		if ( mClusterMembers.size() == 1 ) {
@@ -440,6 +440,8 @@ void MdmacNetworkLayer::linkFailure( unsigned int nodeId ) {
 
 			mCurrentMaximumClusterSize = 0;
 			mClusterStartTime = 0;
+			mIsClusterHead = false;
+			init();
 	    	//std::cerr << "Cluster (CH: " << mID << ") has died of attrition!\n";
 
 		}
@@ -512,7 +514,7 @@ void MdmacNetworkLayer::receiveHelloMessage( MdmacControlMessage *m ) {
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
 		// If this was a CH, the cluster is dead, so log lifetime
-		if ( mIsClusterHead && mClusterMembers.size() > 1 ) {
+		if ( IsClusterHead() ) {
 
 			Coord pos = mMobility->getCurrentPosition();
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
@@ -556,8 +558,8 @@ void MdmacNetworkLayer::receiveChMessage( MdmacControlMessage *m ) {
 
 	if ( testClusterHeadChange( m->getNodeId() ) ) {
 
-		// If this was a CH, the cluster is dead, so log lifetime
-		if ( mIsClusterHead ) {
+		// If this was a CH, the cluster has been cannibalised, so log lifetime
+		if ( IsClusterHead() ) {
 
 			Coord pos = mMobility->getCurrentPosition();
 			emit( mSigClusterLifetime, simTime() - mClusterStartTime );
@@ -569,9 +571,6 @@ void MdmacNetworkLayer::receiveChMessage( MdmacControlMessage *m ) {
 			mCurrentMaximumClusterSize = 0;
 			mClusterStartTime = 0;
 
-	    	//std::cerr << "Cluster (CH: " << mID << ") has died! " << mID << " joined CH" << m->getNodeId() << ". w("  << mID <<  ")=" << mWeight << "; w("  << m->getNodeId() <<  ")=" << m->getWeight() << "; \n";
-            emit( mSigHeadChange, 1 );
-
 		}
 
         emit( mSigHeadChange, 1 );
@@ -582,7 +581,7 @@ void MdmacNetworkLayer::receiveChMessage( MdmacControlMessage *m ) {
 
 	} else {
 
-		if ( mIsClusterHead ) {
+		if ( IsClusterHead() ) {
 
 			bool sizeChanged = false;
 
@@ -628,11 +627,12 @@ void MdmacNetworkLayer::receiveJoinMessage( MdmacControlMessage *m ) {
 
 		} else if ( mClusterMembers.find( m->getNodeId() ) != mClusterMembers.end() ) {
 
+			// This join message came from a member of our cluster
 			mClusterMembers.erase( m->getNodeId() );
 			sizeChanged = true;
 			if ( mClusterMembers.size() == 1 ) {
+				// Death by attrition.
 		    	//std::cerr << "Cluster (CH: " << mID << ") has died of attrition!\n";
-	            emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 				Coord pos = mMobility->getCurrentPosition();
 				emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 				emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
@@ -642,6 +642,8 @@ void MdmacNetworkLayer::receiveJoinMessage( MdmacControlMessage *m ) {
 
 				mCurrentMaximumClusterSize = 0;
 				mClusterStartTime = 0;
+				mIsClusterHead = false;
+				init();
 				sizeChanged = false;
 			}
 
