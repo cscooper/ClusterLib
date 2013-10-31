@@ -32,28 +32,29 @@ launchdConfigFormat = """<?xml version="1.0"?>
 
 def parseOptions( argv ):
 	optParser = OptionParser()
-	optParser.add_option("-d",     "--directory",         dest="directory",          help="Define the maps directory.")
-	optParser.add_option("-L",      "--lane.min",          dest="minLanes",            help="Minimum number of lanes.",   type = "int",   default=1 )
-	optParser.add_option("-l",      "--lane.max",          dest="maxLanes",            help="Maximum number of lanes.",   type = "int",   default=4 )
-	optParser.add_option("-S",       "--runTime",           dest="runTime",   help="Time taken for a car to traverse.",   type = "int", default=900 )
-	optParser.add_option("-j",  "--junction.min",       dest="minJunction",        help="Minimum number of junctions.",   type = "int",   default=0 )
-	optParser.add_option("-J",  "--junction.max",       dest="maxJunction",        help="Maximum number of junctions.",   type = "int",   default=5 )
-	optParser.add_option("-p",    "--cornerPath",        dest="cornerPath", help="Directory of the CORNER classifier." )
-	optParser.add_option("-c",   "--clusterPath",       dest="clusterPath",  help="Directory of the ClusterLib tools." )
-	optParser.add_option("-C",  "--cbdRoutePath",      dest="cbdRoutePath",    help="Directory of the CBDRouter tool." )
-	optParser.add_option("-V",  "--vehicleTypes",      dest="vehicleTypes",       help="Vehicle type definition file." )
-	optParser.add_option("-R",  "--route-number",       dest="routeNumber",       help="Number of routes to generate.",   type = "int", default=250 )
-	optParser.add_option("-t",  "--maximum-time",           dest="maxTime",   help="The time limit of the simulation.",   type = "int", default=2000 )
-	optParser.add_option("-D",    "--do-reverse",         dest="doReverse",     help="Create a reverse of each route.",  default=False, action='store_true' )
-	optParser.add_option("-H",       "--highway",           dest="highway",                       help="Do a highway.",  default=False, action='store_true' )
-	optParser.add_option("-a",     "--speed.min",          dest="minSpeed",       help="Minimum Highway speed (km/h).", type = "int", default=40 )
-	optParser.add_option("-A",     "--speed.max",          dest="maxSpeed",       help="Maximum Highway speed (km/h).", type = "int", default=120 )
-	optParser.add_option("-f",    "--speed.step",         dest="stepSpeed",          help="Highway speed step (km/h).", type = "int", default=20 )
-	optParser.add_option("-v",  "--minCarNumber",  dest="minVehicleNumber",   help="Minimum car density per tx range.", type = "float", default=1 )
-	optParser.add_option("-y",  "--maxCarNumber",  dest="maxVehicleNumber",   help="Maximum car density per tx range.", type = "float", default=10 )
-	optParser.add_option("-Y", "--stepCarNumber", dest="stepVehicleNumber",                  help="Vehicle increment.", type = "float", default=1 )
-	optParser.add_option("-r", "--transmitRange",     dest="transmitRange",         help="Vehicle transmission range.", type = "float", default=100 )
-	optParser.add_option("-w",     "--laneWidth",         dest="laneWidth",                         help="Lane width.", type = "float", default=2.5 )
+	optParser.add_option("-d",       "--directory",         dest="directory",          help="Define the maps directory.")
+	optParser.add_option("-L",        "--lane.min",          dest="minLanes",            help="Minimum number of lanes.",   type = "int",   default=1 )
+	optParser.add_option("-l",        "--lane.max",          dest="maxLanes",            help="Maximum number of lanes.",   type = "int",   default=4 )
+	optParser.add_option("-S",         "--runTime",           dest="runTime",   help="Time taken for a car to traverse.",   type = "int", default=900 )
+	optParser.add_option("-j",    "--junction.min",       dest="minJunction",        help="Minimum number of junctions.",   type = "int",   default=0 )
+	optParser.add_option("-J",    "--junction.max",       dest="maxJunction",        help="Maximum number of junctions.",   type = "int",   default=5 )
+	optParser.add_option("-p",      "--cornerPath",        dest="cornerPath", help="Directory of the CORNER classifier." )
+	optParser.add_option("-c",     "--clusterPath",       dest="clusterPath",  help="Directory of the ClusterLib tools." )
+	optParser.add_option("-C",    "--cbdRoutePath",      dest="cbdRoutePath",    help="Directory of the CBDRouter tool." )
+	optParser.add_option("-V",    "--vehicleTypes",      dest="vehicleTypes",       help="Vehicle type definition file." )
+	optParser.add_option("-R",    "--route-number",       dest="routeNumber",       help="Number of routes to generate.",   type = "int", default=250 )
+	optParser.add_option("-t",    "--maximum-time",           dest="maxTime",   help="The time limit of the simulation.",   type = "int", default=2000 )
+	optParser.add_option("-D",      "--do-reverse",         dest="doReverse",     help="Create a reverse of each route.",  default=False, action='store_true' )
+	optParser.add_option("-H",         "--highway",           dest="highway",                       help="Do a highway.",  default=False, action='store_true' )
+	optParser.add_option("-a",       "--speed.min",          dest="minSpeed",       help="Minimum Highway speed (km/h).", type = "int", default=40 )
+	optParser.add_option("-A",       "--speed.max",          dest="maxSpeed",       help="Maximum Highway speed (km/h).", type = "int", default=120 )
+	optParser.add_option("-f",      "--speed.step",         dest="stepSpeed",          help="Highway speed step (km/h).", type = "int", default=20 )
+	optParser.add_option("-v",    "--minCarNumber",  dest="minVehicleNumber",   help="Minimum car density per tx range.", type = "float", default=1 )
+	optParser.add_option("-y",    "--maxCarNumber",  dest="maxVehicleNumber",   help="Maximum car density per tx range.", type = "float", default=10 )
+	optParser.add_option("-Y",   "--stepCarNumber", dest="stepVehicleNumber",                  help="Vehicle increment.", type = "float", default=1 )
+	optParser.add_option("-r",   "--transmitRange",     dest="transmitRange",         help="Vehicle transmission range.", type = "float", default=100 )
+	optParser.add_option("-w",       "--laneWidth",         dest="laneWidth",                         help="Lane width.", type = "float", default=2.5 )
+	optParser.add_option("-b", "--turnProbability",   dest="turnProbability",       help="Probability of a car turning.", type = "float", default=0.5 )
 	(options, args) = optParser.parse_args(argv)
 
 	if not options.directory:
@@ -140,7 +141,7 @@ def generateHighways( options ):
 
 
 def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, laneCount, speed, options ):
-	carRate = 2 * options.transmitRange * laneCount * options.laneWidth * speed * vehicleRate / ( 3.6 * roadLength )
+	carRate = 2 * speed * vehicleRate / ( 3.6 * options.transmitRange * laneCount )
 	#print "road length = ", roadLength
 	#print "vehicle count = ", vehicleRate
 	#print "speed = ", speed, "kmph (", speed/3.6, "m/s)"
@@ -161,13 +162,22 @@ def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, lan
 		for t in range(0,options.maxTime):
 			if ( t - lastGen ) == genPeriod:
 				for n in range(0,numGen):
-					turnOff = random.randint(0,1) == 1 and junctionCount > 0
+					turnOff = junctionCount > 0
+					sinkIndex = None
 					if turnOff:
-						sinkEdge = str( random.randrange( 1, junctionCount+1 ) ) + "_"
+						for n in range(1,junctionCount+1):
+							if numpy.random.random() < options.turnProbability:
+								sinkIndex = n
+								break
+						if not sinkIndex:
+							turnOff = False
+
+					if turnOff:
+						sinkEdge = str(sinkIndex)
 						if random.randint(0,1) == 1:
-							sinkEdge += "goup"
+							sinkEdge += "_goup"
 						else:
-							sinkEdge += "godown"
+							sinkEdge += "_godown"
 					else:
 						sinkEdge = str(junctionCount) + "_" + str(junctionCount+1)
 					ID += 1

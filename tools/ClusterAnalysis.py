@@ -8,7 +8,7 @@ from OmnetReader import DataContainer
 
 
 
-metricPresentation = { "overhead" : "Overhead", "helloOverhead" : "Hello Overhead", "clusterLifetime" : "Cluster Lifetime" , "clusterSize" : "Cluster Size", "headChange" : "Reaffiliation" }
+metricPresentation = { "overhead" : "Overhead", "helloOverhead" : "Hello Overhead", "clusterLifetime" : "Cluster Lifetime" , "clusterSize" : "Cluster Size", "headChange" : "Reaffiliation", "faultAffiliation" : "Fault Affiliation" }
 metricUnits = { "overhead" : "B", "helloOverhead" : "B", "clusterLifetime" : "s", "clusterSize" : None, "headChange" : None }
 metricMultiplier = { "overhead" : 1, "helloOverhead" : 1, "clusterLifetime" : 1 , "clusterSize" : 1, "headChange" : 1 }
 
@@ -53,10 +53,10 @@ def enumerateConfigs( directoryName, useTar ):
 
 # Collect the results from the given data container.
 def collectResults( dataContainer ):
-	results = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [] }
-	counts = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0 }
-	minima = { "overhead" : numpy.inf, "helloOverhead" : numpy.inf, "clusterLifetime" : numpy.inf, "clusterSize" : numpy.inf, "headChange" : numpy.inf }
-	maxima = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0 }
+	results = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [] }
+	counts = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0, "faultAffiliation" : 0 }
+	minima = { "overhead" : numpy.inf, "helloOverhead" : numpy.inf, "clusterLifetime" : numpy.inf, "clusterSize" : numpy.inf, "headChange" : numpy.inf, "faultAffiliation" : numpy.inf }
+	maxima = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0, "faultAffiliation" : 0 }
 
 	# Get the list of scalars
 	scalarList = dataContainer.getScalarList()
@@ -64,7 +64,7 @@ def collectResults( dataContainer ):
 		moduleName = scalarDef[0]
 		scalarName = scalarDef[1]
 
-		if "net" not in moduleName:
+		if "net" not in moduleName and "manager" not in moduleName:
 			continue
 
 		resName = scalarName.split(":")[0]
@@ -86,7 +86,7 @@ def collectResults( dataContainer ):
 		moduleName = statisic[0]
 		statName = statisic[1]
 
-		if "net" not in moduleName:
+		if "net" not in moduleName and "manager" not in moduleName:
 			continue
 
 		resName = statName.split(":")[0]
@@ -105,13 +105,35 @@ def collectResults( dataContainer ):
 		minima[resName] = min( minima[resName], stat.fields['min'] )
 		maxima[resName] = max( maxima[resName], stat.fields['max'] )
 
+	# For sanity check, calculate the node density against time.
+	# For this we want the position vectors of each node.
+	#carDensity = numpy.zeros(2000)
+	#carMob = [ vec[0] for vec in dataContainer.getVectorList() if "mobility" in vec[0] ]
+	#for mob in carMob:
+		#pos = dataContainer.getVector( mob, "posx" )
+		#startIndex = int(pos[ 0,1])
+		#endIndex   = int(pos[-1,1])
+		#carDensity[startIndex:endIndex] += 1
+
+	#pyplot.plot( carDensity )
+	#pyplot.title( "Run #" + str(dataContainer.getSelectedRun().runId) )
+	#pyplot.show()
+
 	colatedResults = {}
 	for key in results.iterkeys():
-		colatedResults["Mean "    + metricPresentation[key]] = numpy.sum( results[key] ) / counts[key]
-		colatedResults["Maximum " + metricPresentation[key]] = maxima[key]
-		colatedResults["Minimum " + metricPresentation[key]] = minima[key]
-		colatedResults["Total "   + metricPresentation[key]] = numpy.sum( results[key] )
-		colatedResults[metricPresentation[key] + " Rate"] = numpy.sum( results[key] ) / 1800
+		if counts[key] == 0:
+			colatedResults["Mean "    + metricPresentation[key]] = 0
+			colatedResults["Maximum " + metricPresentation[key]] = 0
+			colatedResults["Minimum " + metricPresentation[key]] = 0
+			colatedResults["Total "   + metricPresentation[key]] = 0
+			colatedResults[metricPresentation[key] + " Rate"] = 0
+		else:
+			colatedResults["Mean "    + metricPresentation[key]] = numpy.sum( results[key] ) / counts[key]
+			colatedResults["Maximum " + metricPresentation[key]] = maxima[key]
+			colatedResults["Minimum " + metricPresentation[key]] = minima[key]
+			colatedResults["Total "   + metricPresentation[key]] = numpy.sum( results[key] )
+			colatedResults[metricPresentation[key] + " Rate"] = numpy.sum( results[key] ) / 1100
+#		colatedResults["Maximum Node Density"] = numpy.max( carDensity )
 
 	return colatedResults
 

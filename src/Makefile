@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for libClusterLib
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep --make-so -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
+#  opp_makemake -f --deep --make-so -I/home/craig/Documents/PhD/simulations/ClusterLib/URAE/include -I/home/craig/Documents/PhD/simulations/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
 #
 
 # Name of target to be created (-o option)
@@ -10,6 +10,8 @@ TARGET = libClusterLib$(SHARED_LIB_SUFFIX)
 
 # C++ include paths (with -I)
 INCLUDE_PATH = \
+    -I../URAE/include \
+    -I/home/craig/Documents/PhD/simulations/URAE/include \
     -I../../veins-2.0/src/base/utils \
     -I../../veins-2.0/src/modules \
     -I../../veins-2.0/src/base/phyLayer \
@@ -33,6 +35,7 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
+    $O/ClusterAnalysisScenarioManager.o \
     $O/HighestDegreeCluster.o \
     $O/ClusterTestScenarioManager.o \
     $O/ClusterAlgorithm.o \
@@ -149,6 +152,8 @@ $O/ClusterAlgorithm.o: ClusterAlgorithm.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/ClusterAnalysisScenarioManager.o: ClusterAnalysisScenarioManager.cc \
+	ClusterAnalysisScenarioManager.h
 $O/ClusterDraw.o: ClusterDraw.cc \
 	ClusterDraw.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
@@ -297,6 +302,7 @@ $O/MdmacControlMessage_m.o: MdmacControlMessage_m.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
 $O/MdmacNetworkLayer.o: MdmacNetworkLayer.cc \
 	ClusterAlgorithm.h \
+	ClusterAnalysisScenarioManager.h \
 	MdmacControlMessage_m.h \
 	MdmacNetworkLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \

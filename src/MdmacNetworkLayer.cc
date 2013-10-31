@@ -34,6 +34,8 @@
 
 #include "MdmacNetworkLayer.h"
 
+#include "ClusterAnalysisScenarioManager.h"
+
 Define_Module(MdmacNetworkLayer);
 
 std::ostream& operator<<( std::ostream& os, const MdmacNetworkLayer::Neighbour& n ) {
@@ -329,6 +331,7 @@ void MdmacNetworkLayer::init() {
 		mClusterMembers.clear();
     	//std::cerr << "Node: " << mID << " joined CH!: " << nMax << "\n";
 		sendClusterMessage( JOIN_MESSAGE, nMax );
+		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent(mID, nMax);
 
 	}
 
@@ -539,6 +542,7 @@ void MdmacNetworkLayer::receiveHelloMessage( MdmacControlMessage *m ) {
 		mClusterMembers.clear();
 		mClusterHead = m->getNodeId();
 		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
+		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mID, m->getNodeId() );
 
 	}
 
@@ -578,6 +582,7 @@ void MdmacNetworkLayer::receiveChMessage( MdmacControlMessage *m ) {
 		mClusterMembers.clear();
 		mClusterHead = m->getNodeId();
 		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
+		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mID, m->getNodeId() );
 
 	} else {
 
@@ -624,6 +629,7 @@ void MdmacNetworkLayer::receiveJoinMessage( MdmacControlMessage *m ) {
 				mClusterStartTime = simTime();	// start of cluster lifetime.
 		        //std::cerr << "Node: " << mID << " has become a CH!\n";
 			}
+			ClusterAnalysisScenarioManagerAccess::get()->joinMessageReceived( m->getNodeId(), mID );
 
 		} else if ( mClusterMembers.find( m->getNodeId() ) != mClusterMembers.end() ) {
 
