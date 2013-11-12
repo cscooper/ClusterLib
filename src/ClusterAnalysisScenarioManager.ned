@@ -34,7 +34,7 @@ simple ClusterAnalysisScenarioManager
         string moduleDisplayString = default("i=misc/node2;is=vs;r=0,,#707070,1");  // module displayString to be used in the simulation for each managed vehicle
         string host = default("localhost");  // TraCI server hostname
         int port = default(9999);  // TraCI server port
-        xml launchConfig; // launch configuration to send to sumo-launchd
+        xml launchConfig = default( xmldoc("maps/simFile.launchd.xml") ); // launch configuration to send to sumo-launchd
         int seed = default(-1); // seed value to set in launch configuration, if missing (-1: current run number)
         bool autoShutdown = default(true);  // Shutdown module as soon as no more vehicles are in the simulation
         int margin = default(25);  // margin to add to all received vehicle positions
@@ -52,7 +52,7 @@ simple ClusterAnalysisScenarioManager
 		string intLinkMapFile = default("");
 		string riceFile = default("");
 		string carDefFile = default("");
-		double laneWidth @unit("m") = default(5m);
+		double laneWidth @unit("m") = default(2.5m);
 		double waveLength @unit("m") = default(0.125m);
 		double txPower @unit("mW") = default(80mW);
 		double systemLoss = default(1142.9);	// NOTE: This should be determined experimentally
@@ -61,4 +61,22 @@ simple ClusterAnalysisScenarioManager
 		string componentFile = default("default.fading");
 		int randSeed = default(1234);
 		int gridSize @unit("m") = default(200m);
+
+		int simulationTime @unit(s) = default(3000s);
+		int warmupTime @unit(s) = default(1000s);
+		string simType = default("highway");
+		int junctionCount = default(0);
+		int laneCount = default(1);
+		int carSpeed @unit("kmph") = default(40kmph);
+		double nodeDensity = default(2);
+		double turnProbability = default(0.1);
+
+		// Graphics display stuff
+		bool visualiser = default(false);
+		double displayWidth = default(1280);
+		double displayHeight = default(960);
+		double framesPerSecond = default(1);
+		int playgroundSizeX @unit("m");
+		int playgroundSizeY @unit("m");
+
 }

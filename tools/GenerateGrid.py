@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, subprocess, random, math, numpy
+import sys, os, subprocess, random, math, numpy, csv
 from optparse import OptionParser
 
 
@@ -30,6 +30,61 @@ launchdConfigFormat = """<?xml version="1.0"?>
 """
 
 
+
+def CreateVehicleDefinitionXML( vDef ):
+	vDefStr = "<vType"
+	for k in vDef.iterkeys():
+		if k == "height" or k == "weight":
+			continue	# height doesn't go into the xml file
+		vDefStr = vDefStr + " " + k + "=\"" + vDef[k] + "\""
+	vDefStr = vDefStr + "/>"
+	return vDefStr
+
+
+def LoadVehicleDefinitions( fname ):
+	vehicleDefinitions = []
+	with open( fname, "r" ) as f:
+		r = csv.reader( f, delimiter=" " )
+
+		for line in r:
+			vehicleDef = {}
+			vehicleDef["id"] 	 = line[0]
+			vehicleDef["accel"]  = line[1]
+			vehicleDef["decel"]  = line[2]
+			vehicleDef["sigma"]  = line[3]
+			vehicleDef["length"] = line[4]
+			vehicleDef["color"]  = line[5]
+			vehicleDef["width"]  = line[6]
+			vehicleDef["height"] = line[7]
+			vehicleDef["weight"] = float(line[8])
+			vehicleDef["minGap"] = line[9]
+			vehicleDefinitions.append( vehicleDef )
+
+	wSum = 0
+	for vDef in vehicleDefinitions:
+		wSum += vDef["weight"]
+	if wSum != 1:
+		for vDef in vehicleDefinitions:
+			vDef["weight"] /= wSum
+
+	print "Loaded " + str(len(vehicleDefinitions)) + " vehicle definitions."
+	return vehicleDefinitions
+
+def PickRandomVehicleType( vehicleDefinitions ):
+	if not vehicleDefinitions:
+		return "typeWE"
+
+	n = float( random.random() )
+	v = None
+	for vDef in sorted( vehicleDefinitions, key=lambda v: v["weight"] ):
+		if n < vDef["weight"]:
+			v = vDef
+			break
+		else:
+			n -= vDef["weight"]
+	return v["id"]
+
+
 def parseOptions( argv ):
 	optParser = OptionParser()
 	optParser.add_option("-d",       "--directory",         dest="directory",          help="Define the maps directory.")
@@ -46,15 +101,16 @@ def parseOptions( argv ):
 	optParser.add_option("-t",    "--maximum-time",           dest="maxTime",   help="The time limit of the simulation.",   type = "int", default=2000 )
 	optParser.add_option("-D",      "--do-reverse",         dest="doReverse",     help="Create a reverse of each route.",  default=False, action='store_true' )
 	optParser.add_option("-H",         "--highway",           dest="highway",                       help="Do a highway.",  default=False, action='store_true' )
-	optParser.add_option("-a",       "--speed.min",          dest="minSpeed",       help="Minimum Highway speed (km/h).", type = "int", default=40 )
-	optParser.add_option("-A",       "--speed.max",          dest="maxSpeed",       help="Maximum Highway speed (km/h).", type = "int", default=120 )
-	optParser.add_option("-f",      "--speed.step",         dest="stepSpeed",          help="Highway speed step (km/h).", type = "int", default=20 )
-	optParser.add_option("-v",    "--minCarNumber",  dest="minVehicleNumber",   help="Minimum car density per tx range.", type = "float", default=1 )
-	optParser.add_option("-y",    "--maxCarNumber",  dest="maxVehicleNumber",   help="Maximum car density per tx range.", type = "float", default=10 )
-	optParser.add_option("-Y",   "--stepCarNumber", dest="stepVehicleNumber",                  help="Vehicle increment.", type = "float", default=1 )
-	optParser.add_option("-r",   "--transmitRange",     dest="transmitRange",         help="Vehicle transmission range.", type = "float", default=100 )
-	optParser.add_option("-w",       "--laneWidth",         dest="laneWidth",                         help="Lane width.", type = "float", default=2.5 )
-	optParser.add_option("-b", "--turnProbability",   dest="turnProbability",       help="Probability of a car turning.", type = "float", default=0.5 )
+	optParser.add_option("-a",       "--speed.min",          dest="minSpeed",       help="Minimum Highway speed (km/h).",  type = "int", default=40 )
+	optParser.add_option("-A",       "--speed.max",          dest="maxSpeed",       help="Maximum Highway speed (km/h).",  type = "int", default=120 )
+	optParser.add_option("-f",      "--speed.step",         dest="stepSpeed",          help="Highway speed step (km/h).",  type = "int", default=20 )
+	optParser.add_option("-v",    "--minCarNumber",  dest="minVehicleNumber",   help="Minimum car density per tx range.",  type = "float", default=1 )
+	optParser.add_option("-y",    "--maxCarNumber",  dest="maxVehicleNumber",   help="Maximum car density per tx range.",  type = "float", default=10 )
+	optParser.add_option("-Y",   "--stepCarNumber", dest="stepVehicleNumber",                  help="Vehicle increment.",  type = "float", default=1 )
+	optParser.add_option("-r",   "--transmitRange",     dest="transmitRange",         help="Vehicle transmission range.",  type = "float", default=100 )
+	optParser.add_option("-w",       "--laneWidth",         dest="laneWidth",                         help="Lane width.",  type = "float", default=2.5 )
+	optParser.add_option("-b", "--turnProbability",   dest="turnProbability",       help="Probability of a car turning.",  type = "float", default=0.5 )
+	optParser.add_option("-B",      "--filePrefix",        dest="filePrefix",              help="Generated file prefix.", type = "string" )
 	(options, args) = optParser.parse_args(argv)
 
 	if not options.directory:
@@ -131,7 +187,10 @@ def generateHighways( options ):
 		for junctionCount in range( options.minJunction, options.maxJunction+1, 1 ):
 			for speed in range( options.minSpeed, options.maxSpeed+1, options.stepSpeed ):
 				roadLength = options.runTime * speed / ( 3.6 * ( junctionCount + 1 ) )
-				filename = "highway-" + str(junctionCount) + "-" + str(laneCount) + "lane-" + str(speed) + "kmph"
+				if options.filePrefix:
+					filename = options.filePrefix
+				else:
+					filename = "highway-" + str(junctionCount) + "-" + str(laneCount) + "lane-" + str(speed) + "kmph"
 				print "Generating '" + filename + "'..."
 				generateHighway( junctionCount, roadLength, laneCount, speed / 3.6, filename )
 				fileList.append( [filename, laneCount, roadLength, speed, junctionCount] )
@@ -141,16 +200,19 @@ def generateHighways( options ):
 
 
 def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, laneCount, speed, options ):
+	# Load vehicle types
+	vTypes = LoadVehicleDefinitions( options.vehicleTypes )
+
 	carRate = 2 * speed * vehicleRate / ( 3.6 * options.transmitRange * laneCount )
-	#print "road length = ", roadLength
-	#print "vehicle count = ", vehicleRate
-	#print "speed = ", speed, "kmph (", speed/3.6, "m/s)"
-	#print "car rate = ", carRate
-	#print "car period = ", 1/carRate 
-	#print "num gen = ", int( math.ceil( carRate ) )
 	with open( "tmp.trip", "w" ) as f:
 		f.write( '<?xml version="1.0"?>\n' )
+
 		f.write( '<trips>\n' )
+
+		# Write the definitions
+		for t in vTypes:
+			f.write( "\t" + CreateVehicleDefinitionXML( t ) + '\n' )
+
 		genPeriod = math.ceil( 1/carRate )
 		numGen = 1
 		if genPeriod <= 1:
@@ -181,11 +243,15 @@ def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, lan
 					else:
 						sinkEdge = str(junctionCount) + "_" + str(junctionCount+1)
 					ID += 1
-					f.write( '<trip id="car_{0}" depart="{1}" from="0_1" to="{2}" departLane="free" />\n'.format( ID, t, sinkEdge ) )
+					f.write( '<trip id="car_{0}" depart="{1}" from="0_1" to="{2}" departLane="free" type="{3}" />\n'.format( ID, t, sinkEdge, PickRandomVehicleType(vTypes) ) )
 				lastGen = t
 		f.write( '</trips>\n' )
 
-	p = subprocess.Popen( ['duarouter','-n',filename+'.net.xml','-t','tmp.trip','-o',filename + "-" + str(vehicleRate) + "cars.rou.xml"] )
+	if options.filePrefix:
+		outputFilename = options.filePrefix + ".rou.xml"
+	else:
+		outputFilename = filename + "-" + str(vehicleRate) + "cars.rou.xml"
+	p = subprocess.Popen( ['duarouter','-n',filename+'.net.xml','-t','tmp.trip','-o',outputFilename] )
 	p.wait()
 	os.remove("tmp.trip")
 
@@ -201,7 +267,10 @@ def analyseFiles( fileList, options ):
 		p.wait()
 
 		for carDensity in numpy.arange( options.minVehicleNumber, options.maxVehicleNumber+options.stepVehicleNumber, options.stepVehicleNumber ): 
-			baseFile = f[0] + "-" + str(carDensity) + "cars"
+			if options.filePrefix:
+				baseFile = options.filePrefix
+			else:
+				m = f[0] + "-" + str(carDensity) + "cars"
 			rouFile = baseFile + ".rou.xml"
 			print "Generating route file '" + rouFile + "'..."
 

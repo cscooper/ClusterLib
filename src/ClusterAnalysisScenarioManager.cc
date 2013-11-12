@@ -15,6 +15,12 @@
 
 #include "ClusterAnalysisScenarioManager.h"
 
+#ifndef NDEBUG
+#include <BaseNetwLayer.h>
+#include "ChannelAccess.h"
+#include "ClusterAlgorithm.h"
+#endif
+
 Define_Module(ClusterAnalysisScenarioManager);
 
 
@@ -45,12 +51,65 @@ void ClusterAnalysisScenarioManager::joinMessageReceived( int srcId, int destId 
 
 void ClusterAnalysisScenarioManager::initialize(int stage) {
 
-	UraeScenarioManager::initialize(stage);
 	if ( stage == 0 ) {
+
+#ifndef NDEBUG
+		// setup the visualiser
+		mVisualiser = par( "visualiser" ).boolValue();
+		if ( mVisualiser ) {
+			mScreenDimensions.x = par(  "displayWidth" ).longValue();
+			mScreenDimensions.y = par( "displayHeight" ).longValue();
+			mFramePeriod = 1 / par( "framesPerSecond" ).doubleValue();
+			Coord areaDims;
+			areaDims.x = par( "playgroundSizeX" ).longValue();
+			areaDims.y = par( "playgroundSizeY" ).longValue();
+			mDrawer = new ClusterDraw( mScreenDimensions, areaDims );
+			if ( !mDrawer )
+				opp_error( "Could not create drawer object." );
+
+			mUpdateMessage = new cMessage;
+			scheduleAt( simTime() + mFramePeriod, mUpdateMessage );
+		}
+#endif
+
+		// Load the parameters of the simulation and generate the maps.
+		std::string simType = par("simType").stringValue();
+		if ( simType == "highway" )
+			mType = Highway;
+		else if ( simType == "grid" )
+			opp_error( "Grid simulations aren't implemented yet!" ); // mType = Grid;
+		else
+			opp_error( "Unknown simulation type '%s'!", simType.c_str() );
+
+		mJunctionCount = par("junctionCount").longValue();
+		mLaneCount = par("laneCount").longValue();
+		mCarSpeed = par("carSpeed").longValue();
+		mNodeDensity = par("nodeDensity").doubleValue();
+		mTurnProbability = par("turnProbability").doubleValue();
+
+		// Generate the maps.
+		char cmd[2000];
+		sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ -B simFile %s > /dev/null",
+				mJunctionCount, mJunctionCount,
+				mLaneCount, mLaneCount,
+				mCarSpeed, mCarSpeed,
+				mNodeDensity, mNodeDensity,
+				mTurnProbability,
+				(const char*)par("carDefFile").stringValue(),
+				par("warmupTime").longValue(),
+				par("simulationTime").longValue(),
+				par("laneWidth").doubleValue(),
+				( mType == Highway ? "-H" : "" ) );
+
+//		std::cerr << "Executing command: " << std::endl << cmd << std::endl;
+		system(cmd);
+
 		mCheckAffiliationRecord = new cMessage();
 		scheduleAt( simTime()+1, mCheckAffiliationRecord );
 		mSigFaultAffiliation = registerSignal( "sigFaultAffiliation" );
+
 	}
+	UraeScenarioManager::initialize(stage);
 
 }
 
@@ -72,6 +131,66 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 
 		scheduleAt( simTime()+1, mCheckAffiliationRecord );
 
+#ifndef NDEBUG
+	} else if ( mVisualiser && m == mUpdateMessage ) {
+
+		for ( std::map<std::string,cModule*>::iterator it = hosts.begin(); it != hosts.end(); it++ ) {
+
+			cModule *clusterAlgorithm = it->second->getSubmodule("net",-1);
+			ClusterAlgorithm *mod = dynamic_cast<ClusterAlgorithm*>(clusterAlgorithm);
+			if ( !mod )
+				continue;
+
+			BaseMobility *mob = dynamic_cast<BaseMobility*>(it->second->getSubmodule("mobility",-1));
+			if ( !mob )
+				continue;
+
+			ClusterDraw::Colour col;
+			bool isHead = mod->IsClusterHead();
+			int numStates = mod->GetStateCount();
+			int currState = mod->GetClusterState();
+
+			int colourCode = currState * 300 / numStates;
+			int r, g, b;
+			r = colourCode % 10;
+			g = ( ( colourCode - r ) % 100 ) / 10;
+			b = ( colourCode - r - g ) / 100;
+			col = ClusterDraw::Colour( r, g, b );
+
+			Coord pos = mob->getCurrentPosition();
+			if ( isHead ) {
+
+				mDrawer->drawCircle( pos, 2, col, 3 );
+
+			} else {
+
+				mDrawer->drawCircle( pos, 2, col );
+                ClusterAlgorithm *p = dynamic_cast<ClusterAlgorithm*>( cSimulation::getActiveSimulation()->getModule( mod->GetClusterHead() ) );
+                if ( p && p != mod ) {
+                    float w;
+                    col = ClusterDraw::Colour(1,0,1);
+                    if ( p->NodeIsMember( mod->getId() ) ) {
+                        col = ClusterDraw::Colour(0,0,0);
+                        w = 2.5;
+                    } else {
+                        mDrawer->drawCircle( pos, 4, col );
+                        w = 1;
+                    }
+                    mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), col, w );
+                }
+
+			}
+
+ 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
+ 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
+ 			mDrawer->drawCircle( pos, radius, ClusterDraw::Colour(0,0,0) );
+
+		}
+		mDrawer->update( mFramePeriod );
+		scheduleAt( simTime() + mFramePeriod, mUpdateMessage );
+
+#endif
+
 	} else {
 
 		UraeScenarioManager::handleSelfMsg( m );
@@ -83,9 +202,26 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 
 void ClusterAnalysisScenarioManager::finish() {
 
+	// clean up all the files, except the launchd file, which needs to be preserved
+	system( "rm ./maps/simFile.net*" );
+	system( "rm ./maps/simFile.rou*" );
+	system( "rm ./maps/simFile.corner.*" );
+	system( "rm ./maps/simFile.lsuf" );
+	system( "rm ./maps/simFile.sumo.*" );
+
 	if ( mCheckAffiliationRecord->isScheduled() )
 		cancelEvent( mCheckAffiliationRecord );
 	delete mCheckAffiliationRecord;
+
+#ifndef NDEBUG
+	if ( mVisualiser ) {
+		if ( mUpdateMessage->isScheduled() )
+			cancelEvent( mUpdateMessage );
+		delete mUpdateMessage;
+		if ( mDrawer )
+			delete mDrawer;
+	}
+#endif
 
 	UraeScenarioManager::finish();
 

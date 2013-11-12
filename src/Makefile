@@ -37,7 +37,6 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 OBJS = \
     $O/ClusterAnalysisScenarioManager.o \
     $O/HighestDegreeCluster.o \
-    $O/ClusterTestScenarioManager.o \
     $O/ClusterAlgorithm.o \
     $O/RmacNetworkLayer.o \
     $O/LSUFData.o \
@@ -153,30 +152,10 @@ $O/ClusterAlgorithm.o: ClusterAlgorithm.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
 $O/ClusterAnalysisScenarioManager.o: ClusterAnalysisScenarioManager.cc \
-	ClusterAnalysisScenarioManager.h
-$O/ClusterDraw.o: ClusterDraw.cc \
-	ClusterDraw.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
-	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
-$O/ClusterTestScenarioManager.o: ClusterTestScenarioManager.cc \
 	ClusterAlgorithm.h \
+	ClusterAnalysisScenarioManager.h \
 	ClusterDraw.h \
-	ClusterTestScenarioManager.h \
-	RmacControlMessage_m.h \
-	RmacNetworkLayer.h \
-	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/ChannelAccess.h \
-	$(VEINS_2_0_PROJ)/src/base/connectionManager/NicEntry.h \
-	$(VEINS_2_0_PROJ)/src/base/messages/NetwPkt_m.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
@@ -192,9 +171,20 @@ $O/ClusterTestScenarioManager.o: ClusterTestScenarioManager.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/PassedMessage.h \
 	$(VEINS_2_0_PROJ)/src/base/utils/SimpleAddress.h \
-	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h \
-	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManager.h \
-	$(VEINS_2_0_PROJ)/src/modules/mobility/traci/TraCIScenarioManagerLaunchd.h
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
+$O/ClusterDraw.o: ClusterDraw.cc \
+	ClusterDraw.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseBattery.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseMobility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseModule.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BaseWorldUtility.h \
+	$(VEINS_2_0_PROJ)/src/base/modules/BatteryAccess.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Coord.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/FWMath.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/HostState.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/MiXiMDefs.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/Move.h \
+	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
 $O/HighestDegreeCluster.o: HighestDegreeCluster.cc \
 	ClusterAlgorithm.h \
 	HighestDegreeCluster.h \
@@ -303,6 +293,7 @@ $O/MdmacControlMessage_m.o: MdmacControlMessage_m.cc \
 $O/MdmacNetworkLayer.o: MdmacNetworkLayer.cc \
 	ClusterAlgorithm.h \
 	ClusterAnalysisScenarioManager.h \
+	ClusterDraw.h \
 	MdmacControlMessage_m.h \
 	MdmacNetworkLayer.h \
 	$(VEINS_2_0_PROJ)/src/base/connectionManager/BaseConnectionManager.h \

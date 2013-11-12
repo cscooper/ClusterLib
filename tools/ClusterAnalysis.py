@@ -175,6 +175,7 @@ def dataCompile( argv ):
 
 			# Get the parameters of this run
 			runAttributes = dataContainers[config].getRunAttributes()
+			channelModel = runAttributes['channelModel']
 			algorithm = runAttributes['networkType']
 			if options.process == 'grid':
 				laneCount = int(runAttributes['laneCount'])
@@ -247,13 +248,16 @@ def dataCompile( argv ):
 				if freshnessThreshold not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness]:
 					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold] = {}
 
+				if channelModel not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel] = {}
+
 				# Add them to the set
 				for metric in results:
 					# If this metric has not been added to this configuration, add it.
-					if metric not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
-						resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = []
+					if metric not in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel]:
+						resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric] = []
 					# Append the result to the list of metrics
-					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric].append( results[metric] )
+					resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric].append( results[metric] )
 
 			elif options.process == 'location':
 				# The location data is specified by the name of the map
@@ -307,12 +311,13 @@ def dataCompile( argv ):
 								for beaconInterval in resultSet[laneCount][junctionCount][speed][carDensity][algorithm]:
 									for initialFreshness in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval]:
 										for freshnessThreshold in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness]:
-											for metric in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
-												metricMean = numpy.mean( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												metricStd  =  numpy.std( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												metricMax  =  numpy.max( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												metricMin  =  numpy.min( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] )
-												resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][metric] = (metricMean, metricStd, metricMax, metricMin)
+											for channelModel in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold]:
+												for metric in resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel]:
+													metricMean = numpy.mean( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric] )
+													metricStd  =  numpy.std( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric] )
+													metricMax  =  numpy.max( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric] )
+													metricMin  =  numpy.min( resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric] )
+													resultSet[laneCount][junctionCount][speed][carDensity][algorithm][beaconInterval][initialFreshness][freshnessThreshold][channelModel][metric] = (metricMean, metricStd, metricMax, metricMin)
 
 		elif options.process == 'location':
 			for location in resultSet:
@@ -332,7 +337,7 @@ def dataCompile( argv ):
 	if options.process == 'grid':
 		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
 	elif options.process == 'highway':
-		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Speed','Node Density','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
+		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Speed','Node Density','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold','Channel Model']
 	elif options.process == 'location':
 		resultSet['settings']['precidence'] = ['Location','Algorithm','Beacon Interval','Initial Freshness','Freshness Threshold']
 
@@ -650,28 +655,31 @@ def highwayAnalyse(resultData):
 		loc = precidence.index(axis)
 		if loc == 0:
 			hVals = sorted( dat.keys() )
-			vVals = [ dat[val][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[val][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 1:
 			hVals = sorted( dat[kwargs[precidence[0]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][val][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][val][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 2:
 			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][val][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][val][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 3:
 			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][val][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][val][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 4:
 			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][val][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][val][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 5:
 			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][val][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][val][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 6:
 			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[6]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][val][kwargs[precidence[7]]][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][val][kwargs[precidence[7]]][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
 		elif loc == 7:
 			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[6]]][kwargs[precidence[7]]].keys() )
-			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][val][kwargs['metric']] for val in hVals ]
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][val][kwargs[precidence[8]]][kwargs['metric']] for val in hVals ]
+		elif loc == 8:
+			hVals = sorted( dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[6]]][kwargs[precidence[7]]][kwargs[precidence[8]]].keys() )
+			vVals = [ dat[kwargs[precidence[0]]][kwargs[precidence[1]]][kwargs[precidence[2]]][kwargs[precidence[3]]][kwargs[precidence[4]]][kwargs[precidence[5]]][kwargs[precidence[6]]][kwargs[precidence[7]]][val][kwargs['metric']] for val in hVals ]
 		return (hVals,vVals)
 
 	markers = list(lines.Line2D.markers.keys())[5:] 

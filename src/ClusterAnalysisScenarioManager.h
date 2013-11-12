@@ -18,6 +18,11 @@
 
 #include <UraeScenarioManager.h>
 
+#ifndef NDEBUG
+#include "ClusterDraw.h"
+#endif
+
+
 class ClusterAnalysisScenarioManager: public UraeScenarioManager {
 
 public:
@@ -39,6 +44,26 @@ private:
 	cMessage *mCheckAffiliationRecord;
 	simsignal_t mSigFaultAffiliation;
 
+	// simulation parameters
+	enum SimulationType {
+		Highway = 0,
+		Grid
+	};
+
+	SimulationType mType;
+	int mJunctionCount;
+	int mLaneCount;
+	int mCarSpeed;
+	double mNodeDensity;
+	double mTurnProbability;
+
+#ifndef NDEBUG
+	bool mVisualiser;
+	ClusterDraw *mDrawer;
+	Coord mScreenDimensions;
+	double mFramePeriod;
+	cMessage *mUpdateMessage;
+#endif
 
 };
 
