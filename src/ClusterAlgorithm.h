@@ -26,11 +26,14 @@ public:
 	virtual int GetStateCount() = 0;
 	virtual int GetClusterState() = 0;
 	virtual bool IsClusterHead() = 0;
+	virtual bool IsSubclusterHead() = 0;
 
 	virtual int GetClusterHead();
 	virtual bool NodeIsMember( unsigned int );
 	virtual void GetClusterMemberList( NodeIdSet* );
 	virtual BaseMobility *GetMobilityModule();
+
+	std::string &GetMessageString() { return mMessageString; }
 
     /** @brief Initialization of the module and some variables*/
     virtual void initialize(int);
@@ -42,6 +45,8 @@ protected:
     int mClusterHead;               /**< ID of the CH we're associated with (initialised to -1). */
     NodeIdSet mClusterMembers;      /**< Set of CMs associated with this node (if it is a CH) */
     BaseMobility *mMobility;		/**< Mobility module for this node. */
+
+    std::string mMessageString;		/**< Message to show in visualiser. */
 
 };
 

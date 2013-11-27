@@ -32,6 +32,8 @@ simple RmacNetworkLayer extends BaseNetwLayer
         double inquiryPeriod @unit("s");          // Period for INQ broadcasts.
         double inquiryResponsePeriod @unit("s");  // Period during which INQ responses are collated.
         double joinTimeoutPeriod @unit("s");      // Period for JOIN timeout.
+        double pollInterval @unit("s");      	  // Polling interval.
+        double pollTimeout @unit("s");      	  // Polling timeout.
 
 }
 

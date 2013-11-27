@@ -184,6 +184,7 @@ public:
 	int GetStateCount();
 	int GetClusterState();
 	bool IsClusterHead();
+	bool IsSubclusterHead();
 
 protected:
 

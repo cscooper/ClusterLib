@@ -38,8 +38,15 @@ public:
     	bool mFilled;			/**< Is the circle filled? */
     };
 
+    struct Text {
+    	Coord mPosition;		/**< Position of text. */
+    	Colour mColour;			/**< Colour of text. */
+    	std::string mText;		/**< String of text. */
+    };
+
     typedef std::vector<Line> LineList;
     typedef std::vector<Circle> CircleList;
+    typedef std::vector<Text> TextList;
 
     /** Default constructor */
     ClusterDraw( Coord dims, Coord pgSize );
@@ -52,6 +59,9 @@ public:
 
     /** Draw a line. */
     void drawLine( Coord p1, Coord p2, Colour c, double thickness = 1 );
+
+    /** Draw a string of text. */
+    void drawString( Coord p, std::string &s, Colour c );
 
     /** Get the current camera height. */
     double getCameraHeight();
@@ -68,6 +78,7 @@ protected:
 
     LineList mLineList;					/**< List of lines to draw. */
     CircleList mCircleList;				/**< List of circles to draw. */
+    TextList mTextList;					/**< List of text objects to draw. */
 
     Coord mScreenDimensions;			/**< Dimensions of the display in pixels. */
     Coord mPlaygroundSize;				/**< Size of the display's playground. */

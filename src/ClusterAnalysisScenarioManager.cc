@@ -150,17 +150,32 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 			int numStates = mod->GetStateCount();
 			int currState = mod->GetClusterState();
 
-			int colourCode = currState * 300 / numStates;
+			int colourCode = currState * 300 / (numStates+1);
 			int r, g, b;
 			r = colourCode % 10;
-			g = ( ( colourCode - r ) % 100 ) / 10;
-			b = ( colourCode - r - g ) / 100;
+			g = ( colourCode / 10 ) % 10;
+			b = ( colourCode / 100 ) % 10;
 			col = ClusterDraw::Colour( r, g, b );
 
 			Coord pos = mob->getCurrentPosition();
 			if ( isHead ) {
 
 				mDrawer->drawCircle( pos, 2, col, 3 );
+				if ( mod->IsSubclusterHead() ) {
+	                ClusterAlgorithm *p = dynamic_cast<ClusterAlgorithm*>( cSimulation::getActiveSimulation()->getModule( mod->GetClusterHead() ) );
+	                if ( p && p != mod ) {
+	                    float w;
+	                    col = ClusterDraw::Colour(1,0,1);
+	                    if ( p->NodeIsMember( mod->getId() ) ) {
+	                        col = ClusterDraw::Colour(0,0,0);
+	                        w = 2.5;
+	                    } else {
+	                        mDrawer->drawCircle( pos, 4, col );
+	                        w = 1;
+	                    }
+	                    mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), col, w );
+	                }
+				}
 
 			} else {
 
@@ -181,9 +196,11 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 
 			}
 
- 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
- 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
- 			mDrawer->drawCircle( pos, radius, ClusterDraw::Colour(0,0,0) );
+			mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
+
+// 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
+// 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
+// 			mDrawer->drawCircle( pos, radius, ClusterDraw::Colour(0,0,0) );
 
 		}
 		mDrawer->update( mFramePeriod );

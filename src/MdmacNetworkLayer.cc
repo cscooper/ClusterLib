@@ -161,6 +161,10 @@ bool MdmacNetworkLayer::IsClusterHead() {
 }
 
 
+bool MdmacNetworkLayer::IsSubclusterHead() {
+	return false;
+}
+
 
 
 /** @brief Handle messages from upper layer */

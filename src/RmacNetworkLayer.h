@@ -37,6 +37,8 @@ public:
         JOIN_MESSAGE,                                 /**< Join a CH. */
         JOIN_RESPONSE_MESSAGE,                        /**< Response to permit a node to join a cluster. */
         JOIN_DENIAL_MESSAGE,                          /**< Response to deny a node to join a cluster. */
+        POLL_MESSAGE,								  /**< A poll message. */
+        POLL_ACK_MESSAGE,							  /**< A poll acknowledgement message. */
         DATA,                                         /**< A datagram. */
         LAST_CLUSTER_MESSAGE_KIND
     };
@@ -102,6 +104,7 @@ public:
 
 	int GetStateCount();
 	bool IsClusterHead();
+	bool IsSubclusterHead();
     int GetClusterState();
 
     /**
@@ -173,13 +176,13 @@ protected:
 
     /**
      * @brief Process the clustering algorithm.
-     * @param[in] bTimeout If true, this must process the current state behaviour in the event of a timeout.
+     * @param[in] msg Timeout message, or NULL if none occurred.
      *
      * This processes the clustering algorithm.
      *
      * @return Returns true if the function needs to be called again, e.g. if a state change occurred.
      */
-    bool Process( bool bTimeout = false );
+    bool Process( cMessage *msg = NULL );
 
     /**
      * @brief Get the one-hop neighbours.
@@ -221,11 +224,22 @@ protected:
     void SendJoinDenial( int id );
 
     /**
+     * @brief Send a POLL unicast to all CMs.
+     */
+    void PollClusterMembers();
+
+    /**
+     * @brief Respond to a POLL unicast.
+     */
+    void AcknowledgePoll( int id );
+
+    /**
      * @brief Calculate the Link Expiration Time.
      * @param[in] pos Position of the target node.
      * @param[in] vel Velocity of the target node.
      * @return The time until the link expires.
      */
+
     double CalculateLinkExpirationTime( Coord pos, Coord vel );
 
     /**
@@ -238,14 +252,16 @@ protected:
 
     unsigned int mId;               /**< The identifier of this node. */
     ClusterState mCurrentState;     /**< This is the current state of the node. */
-    BaseMobility *mMobility;        /**< Pointer to the vehicle's mobility module (to get location and velocity). */
 
     NeighbourTable mNeighbours;     /**< This node's neighbour table. */
+
+    NodeIdSet mWaitingPollAcks;		/**< IDs of nodes we're awaiting poll responses from. */
+
     simtime_t mClusterStartTime;    /**< Time at which this node last became a CH. */
     int mCurrentMaximumClusterSize; /**< Highest number of nodes in the cluster of which we are currently head. */
 
     double mTransmitRangeSq;        /**< Transmission range, squared. */
-    double mZoneOfInterest;         /**< This is double the TX range. Obtained from the PhyLayer module. */
+    double mZoneOfInterest;         /**< ThisCOLLECTING_INQUIRY is double the TX range. Obtained from the PhyLayer module. */
 
     bool mInitialised;              /**< Set to true if the init function has been called. */
 
@@ -259,7 +275,13 @@ protected:
      **/
     /*@{*/
 
-    cMessage *mTimeoutMessage;
+    cMessage *mFirstTimeProcess;				/**< Scheduled when the cluster algorithm starts, to signal the first calling of the Process function. */
+    cMessage *mInquiryTimeoutMessage;			/**< Scheduled for INQ timeout. */
+    cMessage *mInquiryResponseTimeoutMessage;	/**< Scheduled for INQ_RESP timeout. */
+    cMessage *mJoinTimeoutMessage;				/**< Scheduled for JOIN timeout. */
+    cMessage *mPollTriggerMessage;				/**< Message to trigger a CH to poll its members. */
+    cMessage *mPollTimeoutMessage;				/**< Scheduled by CMs and CHMs waiting for poll from their CH. */
+    cMessage *mPollPeriodFinishedMessage;		/**< Message to signify end of poll period. */
 
     /*@}*/
 
@@ -279,6 +301,8 @@ protected:
     double mInquiryPeriod;                  /**< Period for INQ broadcasts. */
     double mInquiryResponsePeriod;          /**< Period during which INQ responses are collated. */
     double mJoinTimeoutPeriod;              /**< Period for JOIN timeout. */
+    double mPollInterval;					/**< Period for CHs polling  */
+    double mPollTimeout;					/**< If a CM doesn't hear a POLL from the CH in this time, it departs the cluster. */
 
     /*@}*/
 
@@ -290,5 +314,8 @@ protected:
     static bool NodePrecidenceAlgorithmPredicate( const Neighbour&, const Neighbour& );
 
 };
+
+
+#define MapHasKey(map,key) ( map.find(key) != map.end() )
 
 #endif /* RMACNETWORKLAYER_H_ */

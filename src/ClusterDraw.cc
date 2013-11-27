@@ -29,7 +29,7 @@ ClusterDraw::ClusterDraw( Coord dims, Coord pgSize ) {
 	mPlaygroundSize = pgSize;
 
 	mScreenDimensions = dims;
-	mCameraPosition = pgSize / 2;
+	mCameraPosition = Coord();
 	mFieldOfView = M_PI / 4;
 	mAspectRatio = dims.y / dims.x;
 	mHeight = mCameraPosition.x / ( 2 * tan( mFieldOfView ) );
@@ -86,6 +86,18 @@ void ClusterDraw::drawLine( Coord p1, Coord p2, Colour c, double thickness ) {
 
 }
 
+
+
+/** Draw a string of text. */
+void ClusterDraw::drawString( Coord p, std::string &s, Colour c ) {
+
+	Text t;
+	t.mPosition = p;
+	t.mColour = c;
+	t.mText = s;
+	mTextList.push_back( t );
+
+}
 
 
 
@@ -209,6 +221,20 @@ void ClusterDraw::update( double elapsedTime ) {
 
 	}
 
+	// Now iterate through all the text objects, correct their positions, and draw them.
+	for ( TextList::iterator textIt = mTextList.begin(); textIt != mTextList.end(); textIt++ ) {
+
+		// Transform the coordinates to screen.
+		Coord newPos = ( textIt->mPosition - topLeft ) * multiplier;
+
+		// Make sure we're on the screen
+		if ( OutsideScreen( newPos ) )
+			continue;	// We're not on the screen, so skip drawing the circle.
+
+		al_draw_textf( mTextFont, al_map_rgb_f( textIt->mColour.r, textIt->mColour.g, textIt->mColour.b ), newPos.x, newPos.y, 0, textIt->mText.c_str() );
+
+	}
+
 	if ( mPrintStatus )
 		printStatus();
 
@@ -216,6 +242,7 @@ void ClusterDraw::update( double elapsedTime ) {
 
 	mLineList.clear();
 	mCircleList.clear();
+	mTextList.clear();
 
 }
 

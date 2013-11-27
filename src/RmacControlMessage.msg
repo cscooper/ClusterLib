@@ -15,8 +15,12 @@
 
 cplusplus {{
 #include "NetwPkt_m.h"
+#include "RMACData.h"
 }}
 packet NetwPkt;
+
+
+class noncobject NeighbourEntrySet;
 
 //
 // Describes the RMAC cluster control message.
@@ -31,5 +35,6 @@ packet RmacControlMessage extends NetwPkt {
 	double xVelocity;				// X-Velocity of the neighbour.
 	double yVelocity;				// Y-Velocity of the neighbour.
     unsigned int connectionCount;   // Number of connections this node has.
+	NeighbourEntrySet neighbourTable;
 
 }
