@@ -34,6 +34,7 @@ simple RmacNetworkLayer extends BaseNetwLayer
         double joinTimeoutPeriod @unit("s");      // Period for JOIN timeout.
         double pollInterval @unit("s");      	  // Polling interval.
         double pollTimeout @unit("s");      	  // Polling timeout.
+        int missedPingThreshold;				  // Maximum number of missed pings before a CM is declared dead.
 
 }
 

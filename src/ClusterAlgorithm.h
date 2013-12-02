@@ -22,6 +22,7 @@ public:
 	virtual ~ClusterAlgorithm();
 
 	typedef std::set<unsigned int> NodeIdSet;
+	typedef std::vector<unsigned int> NodeIdList;
 
 	virtual int GetStateCount() = 0;
 	virtual int GetClusterState() = 0;

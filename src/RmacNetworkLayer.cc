@@ -16,6 +16,7 @@
 #include "BaseNetwLayer.h"
 
 #include <cassert>
+#include <algorithm>
 
 #include "NetwControlInfo.h"
 #include "BaseMacLayer.h"
@@ -72,6 +73,11 @@ double RmacNetworkLayer::GetTimeThreshold() {
 }
 
 
+/** Get a neighbour with the given id. */
+const RmacNetworkLayer::Neighbour &RmacNetworkLayer::GetNeighbour( const int &id ) {
+	return mNeighbours[id];
+}
+
 
 int RmacNetworkLayer::GetStateCount() {
 	return CLUSTER_HEAD_MEMBER+1;
@@ -126,12 +132,14 @@ void RmacNetworkLayer::initialize(int stage)
         mJoinTimeoutPeriod = par("joinTimeoutPeriod").doubleValue();
         mPollInterval = par("pollInterval").doubleValue();
         mPollTimeout = par("pollTimeout").doubleValue();
+        mMissedPingThreshold = par("missedPingThreshold").longValue();
 
         // Setup messages
         mFirstTimeProcess = new cMessage( "firstTime" );
         mInquiryTimeoutMessage = new cMessage( "timeoutINQ" );
         mInquiryResponseTimeoutMessage = new cMessage( "timeoutINQ_RESP" );
         mJoinTimeoutMessage = new cMessage( "timeoutJOIN" );
+        mJoinDenyMessage = new cMessage( "joinDeny" );
         mPollTriggerMessage = new cMessage( "pollTrigger" );
         mPollPeriodFinishedMessage = new cMessage( "pollFinish" );
         mPollTimeoutMessage = new cMessage( "pollTimeout" );
@@ -170,6 +178,10 @@ void RmacNetworkLayer::finish() {
         cancelEvent( mJoinTimeoutMessage );
     delete mJoinTimeoutMessage;
 
+    if ( mJoinDenyMessage->isScheduled() )
+    	cancelEvent( mJoinDenyMessage );
+    delete mJoinDenyMessage;
+
     if ( mPollTriggerMessage->isScheduled() )
         cancelEvent( mPollTriggerMessage );
     delete mPollTriggerMessage;
@@ -185,6 +197,8 @@ void RmacNetworkLayer::finish() {
     ClusterAlgorithm::finish();
 
 }
+
+
 
 
 
@@ -241,6 +255,13 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
             } else {
 
             	// We're accepting this JOIN request.
+            	// If we got a join request from the same node we're trying to join,
+            	// ignore this request.
+            	if ( mProcessState == JOINING && id == mOneHopNeighbours[0] ) {
+            		std::cerr << "IGNORED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+            		break;
+            	}
+
             	// If we're in the middle of an INQ phase, cancel any timeout events.
             	if ( mProcessState == INQUIRY )
             		cancelEvent( mInquiryTimeoutMessage );
@@ -259,12 +280,12 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
                 if ( mCurrentState == UNCLUSTERED )
                     mCurrentState = CLUSTER_HEAD;
                 else if ( mCurrentState == CLUSTER_MEMBER )
-                    mCurrentState = CLUSTER_HEAD_MEMBER;
+                	mCurrentState = CLUSTER_HEAD_MEMBER;
 
                 // Has the state changed?
                 if ( prevState != mCurrentState ) {
                 	// Start the cluster.
-                	if ( prevState == UNCLUSTERED ) {
+                	if ( prevState == UNCLUSTERED || prevState == CLUSTER_MEMBER ) {
                 		// Cluster has started!
                 		mClusterStartTime = simTime();
                 		scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
@@ -272,7 +293,7 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
                     std::cerr << " Became " << ( mCurrentState == CLUSTER_HEAD_MEMBER ? "CHM" : "CH" ) << "!";
                 }
 
-                mCurrentMaximumClusterSize = mClusterMembers.size();
+                mCurrentMaximumClusterSize = std::max( (int)mClusterMembers.size(), mCurrentMaximumClusterSize );
 
                 std::cerr << "|C|=" << mClusterMembers.size() << "\n";
 
@@ -288,35 +309,40 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
 
         case JOIN_RESPONSE_MESSAGE:     // We received a message permitting this node to join a cluster.
 
-            if ( mProcessState == JOINING ) {
+            if ( mProcessState == JOINING || mProcessState == CLUSTERED ) {
                 // We've received a JOIN response.
                 mClusterHead = id;
-                mCurrentState = CLUSTER_MEMBER;
+                if ( mCurrentState == UNCLUSTERED )
+                	mCurrentState = CLUSTER_MEMBER;
+                else if ( mCurrentState == CLUSTER_MEMBER )
+                	mCurrentState = CLUSTER_HEAD_MEMBER;
                 mProcessState = CLUSTERED;
                 cancelEvent( mJoinTimeoutMessage );
-                Process( mJoinTimeoutMessage );
+                Process();
                 if ( mPollTimeoutMessage->isScheduled() )
                 	cancelEvent( mPollTimeoutMessage );
                 scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
-                std::cerr << mId << ": Joined " <<  mOneHopNeighbours[0].mId << std::endl;
+                std::cerr << mId << ": Joined " <<  mOneHopNeighbours[0] << std::endl;
             }
 
             break;
 
         case JOIN_DENIAL_MESSAGE:   // We received a message denying to join a cluster.
 
-            std::cerr << mId << ": Request to join " <<  mOneHopNeighbours[0].mId << " denied!" << std::endl;
+            std::cerr << mId << ": Request to join " <<  mOneHopNeighbours[0] << " denied!" << std::endl;
             if ( mProcessState == JOINING ) {
                 cancelEvent( mJoinTimeoutMessage );
-                Process( mJoinTimeoutMessage );
+                Process( mJoinDenyMessage );	// Process the JOIN_DENY
             }
 
             break;
 
         case POLL_MESSAGE:
 
-        	if ( id != mClusterHead )
+        	if ( id != mClusterHead ) {
+        		std::cerr << "Polled by CH that is not ours!\n";
         		break;	// Ignore this POLL if it's not from our CH.
+        	}
 
         	cancelEvent( mPollTimeoutMessage );
             scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
@@ -327,7 +353,9 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         case POLL_ACK_MESSAGE:
 
         	mWaitingPollAcks.erase(id);
+        	mNeighbours[id].mMissedPings = 0;
         	if ( mWaitingPollAcks.empty() ) {
+        		// All nodes ACK'd
         		cancelEvent( mPollPeriodFinishedMessage );
         		scheduleAt( simTime()+mPollInterval, mPollTriggerMessage );
         	}
@@ -360,12 +388,21 @@ void RmacNetworkLayer::handleSelfMsg(cMessage* msg) {
     	PollClusterMembers();
 
     if ( msg == mPollPeriodFinishedMessage ) {
+
+    	if ( mCurrentState == UNCLUSTERED || mCurrentState == CLUSTER_MEMBER )
+    		return;
+
     	// Polling interval finished
     	// Check for nodes that have not responded
+		std::cerr << mId << ": Poll Period finished!\n";
     	for ( NodeIdSet::iterator it = mWaitingPollAcks.begin(); it != mWaitingPollAcks.end(); it++ ) {
-    		// Remove from both the neighbour table and the cluster
-    		mNeighbours.erase(*it);
-    		mClusterMembers.erase(*it);
+    		// Increment the missed ping counter.
+    		mNeighbours[*it].mMissedPings++;
+    		if ( mNeighbours[*it].mMissedPings >= (int)mMissedPingThreshold ) {
+				// Remove from both the neighbour table and the cluster
+				mNeighbours.erase(*it);
+				mClusterMembers.erase(*it);
+    		}
     	}
     	mWaitingPollAcks.clear();
     	if ( mClusterMembers.empty() ) {
@@ -374,14 +411,15 @@ void RmacNetworkLayer::handleSelfMsg(cMessage* msg) {
     		if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
     			mCurrentState = CLUSTER_MEMBER;	// Just go back to being a normal CM
     		} else if ( mCurrentState == CLUSTER_HEAD ) {
-    			// GoscheduleAt( simTime ) to unclustered state and restart.
+    			// Go to unclustered state and restart.
     			mCurrentState = UNCLUSTERED;
     			mProcessState = START;
 	    		mClusterHead = -1;
-    			cancelEvent( mPollTimeoutMessage );
     			Process();
     		}
-    	} else {
+    	}
+
+    	if ( mCurrentState == CLUSTER_HEAD_MEMBER || mCurrentState == CLUSTER_HEAD ) {
     		scheduleAt( simTime()+mPollInterval, mPollTriggerMessage );
     	}
     }
@@ -488,7 +526,9 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 				} else {
 
 					// We have a set of one hop neighbours. Apply the NPA.
-					std::sort( mOneHopNeighbours.begin(), mOneHopNeighbours.end(), RmacNetworkLayer::NodePrecidenceAlgorithmPredicate );
+					NPA predicate;
+					predicate.mClient = this;
+					std::sort( mOneHopNeighbours.begin(), mOneHopNeighbours.end(), predicate );
 					std::cerr << mId << ": Have " << mOneHopNeighbours.size() << " 1-hop neighbours. Entering JOIN phase.\n";
 
 					// Now go to the joining phase.
@@ -525,6 +565,12 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 
 				if ( msg == mJoinTimeoutMessage ) { // Join timeout. Remove this neighbour from the list.
 					std::cerr << mId << ": JOIN timeout!\n";
+					// The JOIN timeout occurred. We must have gone out of range of this neighbour.
+					// We erase this from the neighbour table as well as the one-hop neighbours.
+					mNeighbours.erase( mOneHopNeighbours[0] );
+					mOneHopNeighbours.erase( mOneHopNeighbours.begin() );
+				} else if ( msg == mJoinDenyMessage ) {
+					std::cerr << mId << ": JOIN denied!\n";
 					mOneHopNeighbours.erase( mOneHopNeighbours.begin() );
 				} else if ( msg ) {
 					break;
@@ -537,8 +583,8 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 					returnValue = true;
 					break;
 				}
-				std::cerr << mId << ": Sending JOIN to " <<  mOneHopNeighbours[0].mId << std::endl;
-				SendJoinRequest( mOneHopNeighbours[0].mId );
+				std::cerr << mId << ": Sending JOIN to " << mOneHopNeighbours[0] << std::endl;
+				SendJoinRequest( mOneHopNeighbours[0] );
 				scheduleAt( simTime() + mJoinTimeoutPeriod, mJoinTimeoutMessage );
 
 				break;
@@ -547,18 +593,18 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 
 			    if ( msg == mPollTimeoutMessage ) {
 			    	// We haven't heard from the CH in a while.
+		    		std::cerr << mId << ": POLL timeout, leaving " << mClusterHead << std::endl;
 			    	if ( mCurrentState == CLUSTER_MEMBER ) {
 				    	// If we're a CM, we go to the unclustered state.
-			    		std::cerr << mId << ": POLL timeout, leaving " << mClusterHead << std::endl;
 			    		mCurrentState = UNCLUSTERED;
 			    		mProcessState = START;
-			    		mNeighbours.erase(mClusterHead);
-			    		mClusterHead = -1;
 			    		returnValue = true;
 			    	} else if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
 				    	// If we're a CHM, we go to the CH state.
 			    		mCurrentState = CLUSTER_HEAD;
 			    	}
+		    		mNeighbours.erase(mClusterHead);
+		    		mClusterHead = -1;
 			    }
 
 				break;
@@ -570,7 +616,7 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
     } while ( returnValue );
 
     char s[100];
-    sprintf( s, "ID:%i; CH:%i; P: %i", mId, mClusterHead, (int)mProcessState );
+    sprintf( s, "ID:%i; CH:%i; |C|: %i", mId, mClusterHead, (int)mClusterMembers.size() );
     mMessageString = s;
 
     return returnValue;
@@ -589,7 +635,7 @@ void RmacNetworkLayer::GetOneHopNeighbours() {
     NeighbourIterator it = mNeighbours.begin();
     for ( ; it != mNeighbours.end(); it++ )
         if ( it->second.mHopCount == 1 )
-            mOneHopNeighbours.push_back( it->second );
+            mOneHopNeighbours.push_back( it->second.mId );
 
 }
 
@@ -642,9 +688,10 @@ void RmacNetworkLayer::SendControlMessage( int type, int id ) {
     		e.mVelocityY = it->second.mVelocity.y;
             e.mConnectionCount = it->second.mConnectionCount;
             e.mHopCount = it->second.mHopCount+1;
+            e.mMissedPings = it->second.mMissedPings;
             e.mTimeStamp = it->second.mTimeStamp;
             pSet.push_back(e);
-            s += 384;
+            s += 328;
     	}
 
     } else if ( type == DATA ) {
@@ -795,6 +842,7 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
     mNeighbours[id].mDistanceToNode = mMobility->getCurrentPosition().distance( mNeighbours[id].mPosition );
     mNeighbours[id].mLinkExpirationTime = CalculateLinkExpirationTime( mNeighbours[id].mPosition, mNeighbours[id].mVelocity );
     mNeighbours[id].mTimeStamp = simTime();
+    mNeighbours[id].mMissedPings = 0;
     mNeighbours[id].mDataOwner = this;
 
 	NeighbourEntrySet &pSet = m->getNeighbourTable();
@@ -814,6 +862,7 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
 			mNeighbours[it->mId].mConnectionCount = it->mConnectionCount;
 			mNeighbours[it->mId].mHopCount = it->mHopCount;
 			mNeighbours[it->mId].mTimeStamp = it->mTimeStamp;
+			mNeighbours[it->mId].mMissedPings = it->mMissedPings;
 		    mNeighbours[it->mId].mProviderId = id;
 		    mNeighbours[it->mId].mDistanceToNode = mMobility->getCurrentPosition().distance( mNeighbours[it->mId].mPosition );
 		    mNeighbours[it->mId].mLinkExpirationTime = CalculateLinkExpirationTime( mNeighbours[it->mId].mPosition, mNeighbours[it->mId].mVelocity );
@@ -828,12 +877,16 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
 
 
 
+
 /**
  * @brief Sorting predicate for the Node Precidence Algorithm.
  *
  * This implements the sorting mechanism for the Node Precidence Algorithm.
  */
-bool RmacNetworkLayer::NodePrecidenceAlgorithmPredicate( const Neighbour &n, const Neighbour &m ) {
+bool RmacNetworkLayer::NPA::operator()( const int &id1, const int &id2 ) {
+
+	const Neighbour &n = mClient->GetNeighbour( id1 );
+	const Neighbour &m = mClient->GetNeighbour( id2 );
 
     // Has 'm' reached its maximum connection limits?
     if ( m.mConnectionCount == n.mDataOwner->GetConnectionLimits() )
@@ -871,7 +924,6 @@ bool RmacNetworkLayer::NodePrecidenceAlgorithmPredicate( const Neighbour &n, con
     return false;       // 'm' has higher precidence.
 
 }
-
 
 
 

@@ -35,22 +35,22 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
-    $O/ClusterAnalysisScenarioManager.o \
-    $O/HighestDegreeCluster.o \
-    $O/ClusterAlgorithm.o \
-    $O/RmacNetworkLayer.o \
-    $O/LSUFData.o \
-    $O/LowestIdCluster.o \
-    $O/LSUFCluster.o \
     $O/ClusterDraw.o \
+    $O/LSUFData.o \
+    $O/ClusterAnalysisScenarioManager.o \
+    $O/LowestIdCluster.o \
+    $O/RmacNetworkLayer.o \
+    $O/LSUFCluster.o \
     $O/MdmacNetworkLayer.o \
-    $O/RmacControlMessage_m.o \
-    $O/MdmacControlMessage_m.o
+    $O/ClusterAlgorithm.o \
+    $O/HighestDegreeCluster.o \
+    $O/MdmacControlMessage_m.o \
+    $O/RmacControlMessage_m.o
 
 # Message files
 MSGFILES = \
-    RmacControlMessage.msg \
-    MdmacControlMessage.msg
+    MdmacControlMessage.msg \
+    RmacControlMessage.msg
 
 # Other makefile variables (-K)
 VEINS_2_0_PROJ=../../veins-2.0

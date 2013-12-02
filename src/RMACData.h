@@ -30,6 +30,7 @@ struct NeighbourEntry {
 	double mVelocityY;                  /**< Velocity of the neighbour (Y). */
 	unsigned int mConnectionCount;      /**< Number of connections this node now has. */
 	unsigned int mHopCount;             /**< Number of hops this neighbour is from this node. */
+	unsigned int mMissedPings;			/**< Number of times this node has missed a ping. */
 	simtime_t mTimeStamp;				/**< Timestamp of this data. */
 };
 

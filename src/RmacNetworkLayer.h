@@ -67,6 +67,7 @@ public:
         unsigned int mProviderId;           /**< Identifier of the node that last provided this information. */
         double mDistanceToNode;             /**< Distance from this node to this neighbour. */
         double mLinkExpirationTime;         /**< Time until this link expires due to mobility. */
+        int mMissedPings;					/**< Number of times this neighbour has missed a ping. */
         RmacNetworkLayer *mDataOwner;		/**< Owner of this data. */
     };
 
@@ -100,6 +101,9 @@ public:
     double GetDistanceThreshold();              /**< Get distance threshold. */
     double GetTimeThreshold();                  /**< Get time threshold. */
 
+    /** Get a neighbour with the given id. */
+    const Neighbour &GetNeighbour( const int &id );
+
     /*@}*/
 
 	int GetStateCount();
@@ -117,6 +121,7 @@ public:
 
     /** @brief Cleanup*/
     virtual void finish();
+
 
 protected:
 
@@ -171,8 +176,8 @@ protected:
 
     };
 
-    ProcessState mProcessState;         /**< Current state the process is in. */
-    NeighbourSet mOneHopNeighbours;     /**< One-hop neighbours. */
+    ProcessState mProcessState;   /**< Current state the process is in. */
+    NodeIdList mOneHopNeighbours; /**< One-hop neighbours. */
 
     /**
      * @brief Process the clustering algorithm.
@@ -279,6 +284,7 @@ protected:
     cMessage *mInquiryTimeoutMessage;			/**< Scheduled for INQ timeout. */
     cMessage *mInquiryResponseTimeoutMessage;	/**< Scheduled for INQ_RESP timeout. */
     cMessage *mJoinTimeoutMessage;				/**< Scheduled for JOIN timeout. */
+    cMessage *mJoinDenyMessage;					/**< Message to signify a JOIN request was denied. */
     cMessage *mPollTriggerMessage;				/**< Message to trigger a CH to poll its members. */
     cMessage *mPollTimeoutMessage;				/**< Scheduled by CMs and CHMs waiting for poll from their CH. */
     cMessage *mPollPeriodFinishedMessage;		/**< Message to signify end of poll period. */
@@ -303,15 +309,19 @@ protected:
     double mJoinTimeoutPeriod;              /**< Period for JOIN timeout. */
     double mPollInterval;					/**< Period for CHs polling  */
     double mPollTimeout;					/**< If a CM doesn't hear a POLL from the CH in this time, it departs the cluster. */
+    unsigned int mMissedPingThreshold;		/**< Number of pings a node will miss before it is considered gone. */
 
     /*@}*/
 
+
     /**
-     * @brief Sorting predicate for the Node Precidence Algorithm.
-     *
      * This implements the sorting mechanism for the Node Precidence Algorithm.
      */
-    static bool NodePrecidenceAlgorithmPredicate( const Neighbour&, const Neighbour& );
+    struct NPA {
+    	bool operator()( const int&, const int& );
+    	RmacNetworkLayer *mClient;
+    };
+
 
 };
 

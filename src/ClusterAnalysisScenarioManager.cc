@@ -177,6 +177,15 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 	                }
 				}
 
+				// Draw lines to nodes this node thinks are part of it's cluster.
+				ClusterAlgorithm::NodeIdSet n;
+				mod->GetClusterMemberList(&n);
+				for ( ClusterAlgorithm::NodeIdSet::iterator it = n.begin(); it != n.end(); it++ ) {
+	                ClusterAlgorithm *p = dynamic_cast<ClusterAlgorithm*>( cSimulation::getActiveSimulation()->getModule( *it ) );
+	                if ( p->GetClusterHead() != mod->getId() )
+	                	mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), ClusterDraw::Colour(1,0,0), 2 );
+				}
+
 			} else {
 
 				mDrawer->drawCircle( pos, 2, col );
@@ -193,10 +202,9 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
                     }
                     mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), col, w );
                 }
+				mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 			}
-
-			mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 // 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
 // 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
