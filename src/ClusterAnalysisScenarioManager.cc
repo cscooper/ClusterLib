@@ -147,15 +147,13 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 
 			ClusterDraw::Colour col;
 			bool isHead = mod->IsClusterHead();
-			int numStates = mod->GetStateCount();
 			int currState = mod->GetClusterState();
 
-			int colourCode = currState * 300 / (numStates+1);
-			int r, g, b;
-			r = colourCode % 10;
-			g = ( colourCode / 10 ) % 10;
-			b = ( colourCode / 100 ) % 10;
-			col = ClusterDraw::Colour( r, g, b );
+			if ( mClusterStateColours.empty() )
+				for ( int i = 0; i < mod->GetStateCount(); i++ )
+					mClusterStateColours.push_back( ClusterDraw::Colour( rand() / (float)RAND_MAX, rand() / (float)RAND_MAX, rand() / (float)RAND_MAX ) );
+
+			col = mClusterStateColours[currState];
 
 			Coord pos = mob->getCurrentPosition();
 			if ( isHead ) {

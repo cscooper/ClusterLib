@@ -63,6 +63,7 @@ private:
 	Coord mScreenDimensions;
 	double mFramePeriod;
 	cMessage *mUpdateMessage;
+	std::vector<ClusterDraw::Colour> mClusterStateColours;
 #endif
 
 };
