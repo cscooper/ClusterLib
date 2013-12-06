@@ -21,6 +21,7 @@ packet NetwPkt;
 
 
 class noncobject NeighbourEntrySet;
+class noncobject NeighbourIdSet;
 
 //
 // Describes the RMAC cluster control message.
@@ -29,12 +30,16 @@ class noncobject NeighbourEntrySet;
 //
 packet RmacControlMessage extends NetwPkt {
 
-	int nodeId;						// Identifier of the neighbour.
-	double xPosition;				// X-Position of the neighbour.
-	double yPosition;				// Y-Position of the neighbour.
-	double xVelocity;				// X-Velocity of the neighbour.
-	double yVelocity;				// Y-Velocity of the neighbour.
-    unsigned int connectionCount;   // Number of connections this node has.
-	NeighbourEntrySet neighbourTable;
+	int nodeId;							// Identifier of the neighbour.
+	double xPosition;					// X-Position of the neighbour.
+	double yPosition;					// Y-Position of the neighbour.
+	double xVelocity;					// X-Velocity of the neighbour.
+	double yVelocity;					// Y-Velocity of the neighbour.
+	bool isClusterHead;					// Is this node a CH or CHM?
+	int clusterHead;					// ID of this node's CH.
+    unsigned int connectionCount;  		// Number of connections this node has.
+	NeighbourEntrySet neighbourTable;	// Neighbour table of this node.
+	NeighbourIdSet neighbourIdTable;	// Set of IDs in neighbour table (used for CLUS_PRES frames).
+	int proposedRole;					// Proposed role of this node (used for CLUS_UNIFY_REQ frames).
 
 }

@@ -86,10 +86,11 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 		mCarSpeed = par("carSpeed").longValue();
 		mNodeDensity = par("nodeDensity").doubleValue();
 		mTurnProbability = par("turnProbability").doubleValue();
+		int seed = par("seed");
 
 		// Generate the maps.
 		char cmd[2000];
-		sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ -B simFile %s > /dev/null",
+		sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ -B simFile %s -q %i > /dev/null",
 				mJunctionCount, mJunctionCount,
 				mLaneCount, mLaneCount,
 				mCarSpeed, mCarSpeed,
@@ -99,7 +100,8 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 				par("warmupTime").longValue(),
 				par("simulationTime").longValue(),
 				par("laneWidth").doubleValue(),
-				( mType == Highway ? "-H" : "" ) );
+				( mType == Highway ? "-H" : "" ),
+				seed );
 
 //		std::cerr << "Executing command: " << std::endl << cmd << std::endl;
 		system(cmd);
@@ -180,7 +182,7 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 				mod->GetClusterMemberList(&n);
 				for ( ClusterAlgorithm::NodeIdSet::iterator it = n.begin(); it != n.end(); it++ ) {
 	                ClusterAlgorithm *p = dynamic_cast<ClusterAlgorithm*>( cSimulation::getActiveSimulation()->getModule( *it ) );
-	                if ( p->GetClusterHead() != mod->getId() )
+	                if ( p && p->GetClusterHead() != mod->getId() )
 	                	mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), ClusterDraw::Colour(1,0,0), 2 );
 				}
 
@@ -200,9 +202,9 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
                     }
                     mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), col, w );
                 }
-				mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 			}
+			mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 // 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
 // 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();

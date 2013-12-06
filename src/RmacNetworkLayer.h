@@ -39,6 +39,10 @@ public:
         JOIN_DENIAL_MESSAGE,                          /**< Response to deny a node to join a cluster. */
         POLL_MESSAGE,								  /**< A poll message. */
         POLL_ACK_MESSAGE,							  /**< A poll acknowledgement message. */
+        SEND_CLUSTER_PRESENCE_MESSAGE,				  /**< Order edge nodes to send CLUSTER_PRESENCE_MESSAGE. */
+        CLUSTER_PRESENCE_MESSAGE,					  /**< Broadcast a cluster's existence. */
+        CLUSTER_UNIFY_REQUEST_MESSAGE,				  /**< Request to unify disjoint clusters. */
+        CLUSTER_UNIFY_RESPONSE_MESSAGE,				  /**< Response to unification request. */
         DATA,                                         /**< A datagram. */
         LAST_CLUSTER_MESSAGE_KIND
     };
@@ -61,6 +65,8 @@ public:
         LAddress::L3Type mNetworkAddress;   /**< The IP address of this neighbour. */
         Coord mPosition;                    /**< Position of the neighbour. */
         Coord mVelocity;                    /**< Velocity of the neighbour. */
+        bool mIsClusterHead;				/**< Whether this node is a CH or CHM. */
+        unsigned int mClusterHead;			/**< ID of the node's CH. */
         unsigned int mConnectionCount;      /**< Number of connections this node now has. */
         unsigned int mHopCount;             /**< Number of hops this neighbour is from this node. */
         simtime_t mTimeStamp;               /**< Last time this entry was updated. */
@@ -172,7 +178,8 @@ protected:
         INQUIRY,                /**< Inquiry phase. */
         COLLECTING_INQUIRY,     /**< We're collecting INQ responses. */
         JOINING,                /**< Join request phase. */
-        CLUSTERED               /**< Clustered phase. */
+        CLUSTERED,              /**< Clustered phase. */
+        UNIFYING				/**< We are unifying with a disjoint cluster. */
 
     };
 
@@ -195,9 +202,14 @@ protected:
     void GetOneHopNeighbours();
 
     /**
+     * @brief Determines whether a nearby cluster is disjoint (true) or connected (false).
+     */
+    bool EvaluateClusterPresence( RmacControlMessage *m );
+
+    /**
      * @brief Send an control message
      */
-    void SendControlMessage( int type, int id = -1 );
+    void SendControlMessage( int type, int id = -1, int role = -1 );
 
     /**
      * @brief Send an INQ broadcast.
@@ -239,6 +251,27 @@ protected:
     void AcknowledgePoll( int id );
 
     /**
+     * @brief Tell edge nodes to broadcast the cluster presence frame.
+     */
+    void OrderClusterPresenceBroadcast();
+
+    /**
+     * @brief Broadcast the cluster presence frame.
+     */
+    void BroadcastClusterPresence();
+
+    /**
+     * @brief Send a cluster unification request.
+     */
+    void RequestClusterUnification( int id );
+
+    /**
+     * @brief Send a cluster unification response.
+     */
+    void SendUnificationResponse( int id, int role );
+
+
+    /**
      * @brief Calculate the Link Expiration Time.
      * @param[in] pos Position of the target node.
      * @param[in] vel Velocity of the target node.
@@ -266,7 +299,7 @@ protected:
     int mCurrentMaximumClusterSize; /**< Highest number of nodes in the cluster of which we are currently head. */
 
     double mTransmitRangeSq;        /**< Transmission range, squared. */
-    double mZoneOfInterest;         /**< ThisCOLLECTING_INQUIRY is double the TX range. Obtained from the PhyLayer module. */
+    double mZoneOfInterest;         /**< This is double the TX range. Obtained from the PhyLayer module. */
 
     bool mInitialised;              /**< Set to true if the init function has been called. */
 
@@ -288,6 +321,8 @@ protected:
     cMessage *mPollTriggerMessage;				/**< Message to trigger a CH to poll its members. */
     cMessage *mPollTimeoutMessage;				/**< Scheduled by CMs and CHMs waiting for poll from their CH. */
     cMessage *mPollPeriodFinishedMessage;		/**< Message to signify end of poll period. */
+    cMessage *mClusterPresenceBeaconMessage;	/**< Message to trigger beaconing of CLUSTER_PRESENCE. */
+    cMessage *mClusterUnifyTimeoutMessage;		/**< Scheduled for timeout of a unify request. */
 
     /*@}*/
 
@@ -322,10 +357,12 @@ protected:
     	RmacNetworkLayer *mClient;
     };
 
+    NodeIdSet mTemporaryClusterRecord;		/**< When a node receives a SEND_CLUSTER_PRESENCE_MESSAGE, it stores the cluster member record here. */
 
 };
 
 
 #define MapHasKey(map,key) ( map.find(key) != map.end() )
+#define ListHasValue(l,v)  ( std::find(l.begin(),l.end(),v) != l.end() )
 
 #endif /* RMACNETWORKLAYER_H_ */

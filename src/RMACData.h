@@ -28,6 +28,8 @@ struct NeighbourEntry {
 	double mPositionY;                  /**< Position of the neighbour (Y). */
 	double mVelocityX;                  /**< Velocity of the neighbour (X). */
 	double mVelocityY;                  /**< Velocity of the neighbour (Y). */
+    bool mIsClusterHead;				/**< Whether this node is a CH or CHM. */
+    unsigned int mClusterHead;			/**< ID of the node's CH. */
 	unsigned int mConnectionCount;      /**< Number of connections this node now has. */
 	unsigned int mHopCount;             /**< Number of hops this neighbour is from this node. */
 	unsigned int mMissedPings;			/**< Number of times this node has missed a ping. */
@@ -37,5 +39,7 @@ struct NeighbourEntry {
 typedef std::vector<NeighbourEntry> NeighbourEntrySet;
 typedef NeighbourEntrySet::iterator NeighbourEntrySetIterator;
 
+typedef std::vector<unsigned int> NeighbourIdSet;
+typedef NeighbourIdSet::iterator NeighbourIdSetIterator;
 
 #endif /* #define RMACDATA_H_ */

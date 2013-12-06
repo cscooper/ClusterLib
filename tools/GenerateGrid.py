@@ -111,12 +111,16 @@ def parseOptions( argv ):
 	optParser.add_option("-w",       "--laneWidth",         dest="laneWidth",                         help="Lane width.",  type = "float", default=2.5 )
 	optParser.add_option("-b", "--turnProbability",   dest="turnProbability",       help="Probability of a car turning.",  type = "float", default=0.5 )
 	optParser.add_option("-B",      "--filePrefix",        dest="filePrefix",              help="Generated file prefix.", type = "string" )
+	optParser.add_option("-q",      "--randomSeed",        dest="randomSeed",                 help="Random seed to set.", type = "int" )
 	(options, args) = optParser.parse_args(argv)
 
 	if not options.directory:
 		print "Please specify results directory."
 		optParser.print_help()
 		sys.exit()
+
+	if options.randomSeed:
+		random.seed( options.randomSeed )
 
 	return options
 
