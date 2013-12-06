@@ -222,7 +222,9 @@ void RmacNetworkLayer::finish() {
 void RmacNetworkLayer::handleUpperMsg(cMessage* msg) {
 
     assert(dynamic_cast<cPacket*>(msg));
-    sendDown(encapsMsg(static_cast<cPacket*>(msg)));
+    NetwPkt *m = encapsMsg(static_cast<cPacket*>(msg));
+    if ( m )
+    	sendDown(m);
 
 }
 
@@ -308,6 +310,10 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
                 		scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
                 		scheduleAt( simTime() + mPollInterval*4, mClusterPresenceBeaconMessage );
                 	}
+                	if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
+                		mClusterHierarchy.clear();
+                		mClusterHierarchy.push_back( mClusterHead );
+                	}
                     std::cerr << " Became " << ( mCurrentState == CLUSTER_HEAD_MEMBER ? "CHM" : "CH" ) << "!";
                 }
 
@@ -332,7 +338,7 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
                 mClusterHead = id;
                 if ( mCurrentState == UNCLUSTERED )
                 	mCurrentState = CLUSTER_MEMBER;
-                else if ( mCurrentState == CLUSTER_MEMBER )
+                else if ( mCurrentState == CLUSTER_HEAD )
                 	mCurrentState = CLUSTER_HEAD_MEMBER;
                 mProcessState = CLUSTERED;
                 cancelEvent( mJoinTimeoutMessage );
@@ -368,6 +374,17 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         		mTemporaryClusterRecord.insert(*it);
 
         	cancelEvent( mPollTimeoutMessage );
+        	// Update our view of the hierarchy
+        	mClusterHierarchy = m->getClusterHierarchy();
+        	if ( ListHasValue( mClusterHierarchy, mId ) ) {
+        		// We're already part of the hierarchy of the CH that just polled us.
+        		// We may be the CH of it's CH or further up the hierarchy.
+        		// Thus we have detected a cyclical structure.
+        		std::cerr << mId << ": Detected cyclical cluster structure!!!\n";
+        		LeaveCluster();
+        		break;
+        	}
+
             scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
         	AcknowledgePoll( id );
 
@@ -394,8 +411,13 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
 
         	// Get the cluster member table out of the frame.
         	mTemporaryClusterRecord.clear();
-        	for ( NeighbourIdSetIterator it = m->getNeighbourIdTable().begin(); it != m->getNeighbourIdTable().end(); it++ )
+        	std::cerr << mId << ": Sending cluster presence message with cluster table: [";
+        	for ( NeighbourIdSetIterator it = m->getNeighbourIdTable().begin(); it != m->getNeighbourIdTable().end(); it++ ) {
         		mTemporaryClusterRecord.insert(*it);
+        		std::cerr << *it << " ";
+        	}
+        	std::cerr << "]\n";
+
         	BroadcastClusterPresence();
 
         	break;
@@ -466,11 +488,18 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         		// as my CH.
         		mCurrentState = CLUSTER_HEAD_MEMBER;
         		mClusterHead = m->getNodeId();
+        		if ( mPollTimeoutMessage->isScheduled() )
+        			cancelEvent( mPollTimeoutMessage );
+                scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
         	} else if ( role == CLUSTER_HEAD_MEMBER ) {
         		// The requesting node will become a CHM and member of my
         		// cluster. So I add it to my node list.
-        		if ( mCurrentState == CLUSTER_MEMBER )
+        		if ( mCurrentState == CLUSTER_MEMBER ) {
         			mCurrentState = CLUSTER_HEAD_MEMBER;
+            		if ( mPollTriggerMessage->isScheduled() )
+            			cancelEvent( mPollTriggerMessage );
+                    scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
+        		}
         		mClusterMembers.insert( m->getNodeId() );
         	}
 
@@ -494,18 +523,46 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         		break;
         	} else if ( role == CLUSTER_HEAD ) {
         		// We've been asked to be a CH. So add this node to our list.
-        		if ( mCurrentState == CLUSTER_MEMBER )
+        		if ( mCurrentState == CLUSTER_MEMBER ) {
         			mCurrentState = CLUSTER_HEAD_MEMBER;
+        			scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
+        		}
         		mClusterMembers.insert( m->getNodeId() );
         	} else if ( role == CLUSTER_HEAD_MEMBER ) {
-        		// We've been told to become a CHM to the this node.
+        		// We've been told to become a CHM to this node.
         		if ( mCurrentState == CLUSTER_HEAD_MEMBER )
         			break;		// We've already got a CH, so forget about the whole thing.
+        		else if ( mCurrentState == CLUSTER_MEMBER )
+        			scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
+        		else if ( mCurrentState == CLUSTER_HEAD )
+        			scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
         		mCurrentState = CLUSTER_HEAD_MEMBER;
         		mClusterHead = m->getNodeId();
         	}
 
         	// Unification complete!
+
+        	break;
+
+        case LEAVE_MESSAGE:
+
+        	// Remove the node from our Cluster record.
+        	mClusterMembers.erase( m->getNodeId() );
+        	if ( mClusterMembers.empty() ) {
+				// TODO: CLUSTER HAS DIED! Record data.
+				std::cerr << mId << ": Cluster Died!\n";
+				if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
+					mCurrentState = CLUSTER_MEMBER;	// Just go back to being a normal CM
+				} else if ( mCurrentState == CLUSTER_HEAD ) {
+					// Go to unclustered state and restart.
+					mCurrentState = UNCLUSTERED;
+					mProcessState = START;
+					mClusterHead = -1;
+					Process();
+				}
+				cancelEvent( mPollTriggerMessage );
+				cancelEvent( mClusterPresenceBeaconMessage );
+        	}
 
         	break;
 
@@ -629,7 +686,12 @@ NetwPkt* RmacNetworkLayer::encapsMsg( cPacket *appPkt ) {
     }
     else{
         coreEV <<"sendDown: get the MAC address\n";
-        macAddr = arp->getMacAddr(netwAddr);
+        if ( simulation.getModule( static_cast<int>(netwAddr ) ) ) {
+        	macAddr = arp->getMacAddr(netwAddr);
+        } else {
+        	coreEV << "sendDown: Cannot find a module with the network address: " << netwAddr << std::endl;
+        	return NULL;
+        }
     }
 
     setDownControlInfo(pkt, macAddr);
@@ -660,6 +722,9 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
     bool returnValue = false;
     do
     {
+
+    	if ( mCurrentState == UNCLUSTERED || mCurrentState == CLUSTER_MEMBER )
+    		mClusterHierarchy.clear();
 
         returnValue = false;
     	switch( mProcessState ) {
@@ -763,6 +828,7 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 				    	// If we're a CHM, we go to the CH state.
 			    		mCurrentState = CLUSTER_HEAD;
 			    	}
+		    		mClusterHierarchy.clear();
 		    		mNeighbours.erase(mClusterHead);
 		    		mClusterHead = -1;
 			    } else if ( msg == mClusterUnifyTimeoutMessage ) {
@@ -775,7 +841,6 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 		};
 
     	msg = NULL;
-
     } while ( returnValue );
 
     char s[100];
@@ -816,9 +881,18 @@ bool RmacNetworkLayer::EvaluateClusterPresence( RmacControlMessage *m ) {
 	if ( ListHasValue( mClusterMembers, m->getNodeId() ) )
 		return false;	// Connected cluster
 
-	// Check if there are any common neighbours.
+	std::cerr << mId << ": Looking for intersection between [";
 	NodeIdSet::iterator it = mClusterMembers.begin();
 	for ( ; it != mClusterMembers.end(); it++ )
+		std::cerr << *it << " ";
+	std::cerr << "] and [";
+	for ( NodeIdList::iterator it = m->getNeighbourIdTable().begin(); it != m->getNeighbourIdTable().end(); it++ )
+		std::cerr << *it << " ";
+	std::cerr << "]\n";
+
+	// Check if there are any common neighbours.
+//	NodeIdSet::iterator it = mClusterMembers.begin();
+	for ( it = mClusterMembers.begin(); it != mClusterMembers.end(); it++ )
 		if( ListHasValue( m->getNeighbourIdTable(), *it ) )
 			return false;
 
@@ -853,6 +927,15 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
         coreEV << "JOIN_REQ";
     } else if ( type == JOIN_RESPONSE_MESSAGE ) {
         coreEV << "JOIN_RESP";
+        // Add the list of CHs in the hierarchy to the packet.
+        NodeIdList &pList = pkt->getClusterHierarchy();
+        for ( NodeIdList::iterator it = mClusterHierarchy.begin(); it != mClusterHierarchy.end(); it++ ) {
+        	pList.push_back(*it);
+        	s += 8;
+        }
+        pList.push_back( mId );
+    	s += 8;
+
     } else if ( type == JOIN_DENIAL_MESSAGE ) {
         coreEV << "JOIN_DENY";
     } else if ( type == POLL_MESSAGE || type == POLL_ACK_MESSAGE ) {
@@ -879,13 +962,29 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
             e.mTimeStamp = it->second.mTimeStamp;
             pSet.push_back(e);
             s += 328;
+            if ( s + 328 > 18496 )
+            	break;
     	}
 
-    	NeighbourIdSet &pIdSet = pkt->getNeighbourIdTable();
-    	NodeIdSet::iterator it = mTemporaryClusterRecord.begin();
-    	for ( ; it != mTemporaryClusterRecord.end(); it++ ) {
-    		pIdSet.push_back( *it );
-    		s += 8;
+    	int sizeToAdd = 8 * ( mTemporaryClusterRecord.size() + mClusterHierarchy.size() + 1 );
+    	if ( ( type == POLL_MESSAGE ) && ( s + sizeToAdd < 18496 ) ) {
+
+    		s += sizeToAdd;
+
+    		// Add the cluster record
+    		NeighbourIdSet &pIdSet = pkt->getNeighbourIdTable();
+			NodeIdSet::iterator it = mTemporaryClusterRecord.begin();
+			for ( ; it != mTemporaryClusterRecord.end(); it++ ) {
+				pIdSet.push_back( *it );
+			}
+
+	        // Add the list of CHs in the hierarchy to the packet.
+	        NodeIdList &pList = pkt->getClusterHierarchy();
+	        for ( NodeIdList::iterator it = mClusterHierarchy.begin(); it != mClusterHierarchy.end(); it++ ) {
+	        	pList.push_back(*it);
+	        }
+	        pList.push_back( mId );
+
     	}
 
     } else if ( type == SEND_CLUSTER_PRESENCE_MESSAGE || type == CLUSTER_PRESENCE_MESSAGE ) {
@@ -895,12 +994,30 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
     	else
     		coreEV << "CLUS_PRES";
 
-    	NeighbourIdSet &pSet = pkt->getNeighbourIdTable();
-    	NodeIdSet::iterator it = mTemporaryClusterRecord.begin();
-    	for ( ; it != mTemporaryClusterRecord.end(); it++ ) {
-    		pSet.push_back( *it );
-    		s += 8;
+    	int sizeToAdd = 8 * ( mTemporaryClusterRecord.size() + mClusterHierarchy.size() + 1 );
+    	if ( s + sizeToAdd < 18496 ) {
+
+    		s += sizeToAdd;
+
+    		// Add the cluster record
+    		NeighbourIdSet &pIdSet = pkt->getNeighbourIdTable();
+			NodeIdSet::iterator it = mTemporaryClusterRecord.begin();
+	        for ( NodeIdSet::iterator it = mTemporaryClusterRecord.begin(); it != mTemporaryClusterRecord.end(); it++ ) {
+	        	pIdSet.push_back(*it);
+	        }
+
+	        // Add the list of CHs in the hierarchy to the packet.
+	        NodeIdList &pList = pkt->getClusterHierarchy();
+	        for ( NodeIdList::iterator it = mClusterHierarchy.begin(); it != mClusterHierarchy.end(); it++ ) {
+	        	pList.push_back(*it);
+	        }
+	        pList.push_back( mId );
+
+    	} else {
+    		coreEV << " CANCELLED!";
+    		return;
     	}
+
 
     } else if ( type == CLUSTER_UNIFY_REQUEST_MESSAGE ) {
         coreEV << "CLUS_UNIFY_REQ";
@@ -908,6 +1025,8 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
     	coreEV << "CLUS_UNIFY_RESP";
         pkt->setProposedRole( role );
         s += 8;
+    } else if ( type == LEAVE_MESSAGE ) {
+    	coreEV << "LEAVE_CLUSTER";
     } else if ( type == DATA ) {
         coreEV << "DATA";
     }
@@ -940,7 +1059,12 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
     }
     else{
         coreEV <<"sendDown: get the MAC address\n";
-        macAddr = arp->getMacAddr(netwAddr);
+        if ( simulation.getModule( static_cast<int>(netwAddr ) ) ) {
+        	macAddr = arp->getMacAddr(netwAddr);
+        } else {
+        	coreEV << "sendDown: Cannot find a module with the network address: " << netwAddr << std::endl;
+        	return;
+        }
     }
 
     setDownControlInfo(pkt, macAddr);
@@ -1065,23 +1189,27 @@ void RmacNetworkLayer::OrderClusterPresenceBroadcast() {
 	}
 
 	if ( best.first == -1 || best.second == -1 ) {
-		std::cerr << mId << ": Found edge node with id -1. ODD!!";
+
+		std::cerr << mId << ": Found edge node pair (" << best.first << "," << best.second << ")";
 		std::cerr << "\t Cluster(" << mId << "): ";
 		for ( it1 = mClusterMembers.begin(); it1 != mClusterMembers.end(); it1++ )
 			std::cerr << *it1 << " ";
 		std::cerr << "\n";
-	}
 
-	// Now we have the two edge nodes! Order them to send the broadcasts.
-	if ( best.first == mId ) {
-		BroadcastClusterPresence();	// One of them is us!
-		SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.second );	// send the order to the other.
-	} else if ( best.second == mId ) {
-		SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.first );	// send the order to the other.
-		BroadcastClusterPresence();	// One of them is us!
 	} else {
-		SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.first );
-		SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.second );
+
+		// Now we have the two edge nodes! Order them to send the broadcasts.
+		if ( best.first == mId ) {
+			BroadcastClusterPresence();	// One of them is us!
+			SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.second );	// send the order to the other.
+		} else if ( best.second == mId ) {
+			SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.first );	// send the order to the other.
+			BroadcastClusterPresence();	// One of them is us!
+		} else {
+			SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.first );
+			SendControlMessage( SEND_CLUSTER_PRESENCE_MESSAGE, best.second );
+		}
+
 	}
 
 	scheduleAt( simTime()+mPollInterval*4, mClusterPresenceBeaconMessage );
@@ -1115,6 +1243,32 @@ void RmacNetworkLayer::SendUnificationResponse( int id, int role ) {
 	SendControlMessage( CLUSTER_UNIFY_RESPONSE_MESSAGE, id, role );
 }
 
+
+
+/**
+ * @brief Leave the cluster.
+ */
+void RmacNetworkLayer::LeaveCluster() {
+
+	if ( mProcessState != CLUSTERED && mProcessState != UNIFYING && mCurrentState == CLUSTER_HEAD )
+		return;
+
+	std::cerr << mId << ": Left Cluster(" << mClusterHead << ")\n";
+
+	SendControlMessage( LEAVE_MESSAGE, mClusterHead );
+	mClusterHead = -1;
+	if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
+		mCurrentState = CLUSTER_HEAD;
+		mClusterHierarchy.clear();
+	} else {
+		if ( mPollTimeoutMessage->isScheduled() )
+			cancelEvent( mPollTimeoutMessage );
+		mCurrentState = UNCLUSTERED;
+		mProcessState = START;
+		Process();
+	}
+
+}
 
 /**
  * @brief Calculate the Link Expiration Time.
@@ -1167,8 +1321,8 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
 		NeighbourEntrySetIterator it = pSet.begin();
 		for ( ; it != pSet.end(); it++ ) {
 
-			if ( MapHasKey( mNeighbours, it->mId ) && mNeighbours[it->mId].mTimeStamp > it->mTimeStamp && mNeighbours[it->mId].mHopCount < it->mHopCount )
-				continue;	// We have more recent and closer data than this.
+			if ( MapHasKey( mNeighbours, it->mId ) && ( mNeighbours[it->mId].mTimeStamp > it->mTimeStamp || mNeighbours[it->mId].mHopCount < it->mHopCount ) )
+				continue;	// We have more recent or closer data than this.
 			mNeighbours[it->mId].mId = it->mId;
 			mNeighbours[it->mId].mNetworkAddress = it->mNetworkAddress;
 			mNeighbours[it->mId].mPosition.x = it->mPositionX;

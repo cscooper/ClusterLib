@@ -40,6 +40,7 @@ packet RmacControlMessage extends NetwPkt {
     unsigned int connectionCount;  		// Number of connections this node has.
 	NeighbourEntrySet neighbourTable;	// Neighbour table of this node.
 	NeighbourIdSet neighbourIdTable;	// Set of IDs in neighbour table (used for CLUS_PRES frames).
+	NeighbourIdSet clusterHierarchy;	// Sequence of cluster heads (used to prevent cyclical clusters).
 	int proposedRole;					// Proposed role of this node (used for CLUS_UNIFY_REQ frames).
 
 }

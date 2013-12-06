@@ -43,6 +43,7 @@ public:
         CLUSTER_PRESENCE_MESSAGE,					  /**< Broadcast a cluster's existence. */
         CLUSTER_UNIFY_REQUEST_MESSAGE,				  /**< Request to unify disjoint clusters. */
         CLUSTER_UNIFY_RESPONSE_MESSAGE,				  /**< Response to unification request. */
+        LEAVE_MESSAGE,								  /**< A CM will send its CH this message if it wishes to leave the cluster. */
         DATA,                                         /**< A datagram. */
         LAST_CLUSTER_MESSAGE_KIND
     };
@@ -270,6 +271,11 @@ protected:
      */
     void SendUnificationResponse( int id, int role );
 
+    /**
+     * @brief Leave the cluster.
+     */
+    void LeaveCluster();
+
 
     /**
      * @brief Calculate the Link Expiration Time.
@@ -358,6 +364,7 @@ protected:
     };
 
     NodeIdSet mTemporaryClusterRecord;		/**< When a node receives a SEND_CLUSTER_PRESENCE_MESSAGE, it stores the cluster member record here. */
+    NodeIdList mClusterHierarchy;			/**< List of heads of clusters within the hierarchy. This is used to prevent cyclical clusters. */
 
 };
 
