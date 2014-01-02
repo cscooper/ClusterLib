@@ -90,7 +90,7 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 
 		// Generate the maps.
 		char cmd[2000];
-		sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ -B simFile %s -q %i > /dev/null",
+		sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ %s -q %i > /dev/null",
 				mJunctionCount, mJunctionCount,
 				mLaneCount, mLaneCount,
 				mCarSpeed, mCarSpeed,
@@ -186,6 +186,8 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 	                	mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), ClusterDraw::Colour(1,0,0), 2 );
 				}
 
+				mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
+
 			} else {
 
 				mDrawer->drawCircle( pos, 2, col );
@@ -204,7 +206,6 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
                 }
 
 			}
-			mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 // 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
 // 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();

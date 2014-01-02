@@ -52,13 +52,6 @@ public:
 		LAST_CLUSTER_MESSAGE_KIND
 	};
 
-	/**
-	 * @brief Types of cluster death.
-	 */
-	enum ClusterDeath {
-		CD_Attrition = 0,
-		CD_Cannibal
-	};
 
 
 	struct Neighbour {
@@ -84,8 +77,6 @@ protected:
 
 	bool mIsClusterHead;					/**< Is this node a CH? */
 	NeighbourSet mNeighbours;				/**< The set of neighbours near this node. */
-	simtime_t mClusterStartTime;			/**< The time at which this node last became a CH. */
-	int mCurrentMaximumClusterSize;			/**< The highest number of nodes in the cluster of which we are currently head. */
 
 	double mTransmitRangeSq;				/**< Required for the freshness calculation. Obtained from the PhyLayer module. */
 
@@ -125,49 +116,7 @@ protected:
     /*@}*/
 
 
-    /**
-     * @name Results
-     * @brief Results to be recorded.
-     *
-     * These members record the performance of the algorithm.
-     * The following performance metrics are recorded:
-     * 		1. Overhead per node:
-     * 		   This is the amount of traffic dedicated to cluster control,
-     * 		   measured as total bytes transmitted.
-     * 		   Type: Scalar
-     * 		2. Overhead per node (HELLO messages only):
-     * 		   This is the amount of traffic dedicated HELLO messages,
-     * 		   measured as total bytes transmitted.
-     * 		   Type: Scalar
-     * 		3. Cluster Lifetime:
-     * 		   A cluster's life begins when a node becomes a CH and obtains
-     * 		   its first CM. It dies either when the CH becomes a CM of another
-     * 		   cluster, or the CH loses all its members. The lifetime is the
-     * 		   time, in seconds, between each of these events.
-     * 		   Type: Scalar
-     *		4. Cluster Size:
-     *		   Larger clusters mean more stability and lighter load on RSU
-     *		   Backbone.
-     *		   Type: Scalar
-     *		5. CH changes per node:
-     *		   How often do CMs change CH?
-     *		   Type: Scalar
-     *
-     **/
-    /*@{*/
 
-	simsignal_t mSigOverhead;			/**< Overhead per node (not including HELLO messages). */
-	simsignal_t mSigHelloOverhead;		/**< Overhead per node (HELLO messages only). */
-	simsignal_t mSigClusterLifetime;	/**< Lifetime of a cluster for which this node is CH. */
-	simsignal_t mSigClusterSize;		/**< Size of the cluster for which this node is CH. */
-	simsignal_t mSigHeadChange;			/**< Changes in CH for this node. */
-
-	simsignal_t mSigClusterDeathType;	/**< Type of cluster death this node goes through. */
-	simsignal_t mSigClusterDeathX;		/**< X position of cluster deaths. */
-	simsignal_t mSigClusterDeathY;		/**< Y position of cluster deaths. */
-
-
-	/*@}*/
 
 public:
     //Module_Class_Members(BaseNetwLayer,BaseLayer,0);
@@ -185,6 +134,12 @@ public:
 	int GetClusterState();
 	bool IsClusterHead();
 	bool IsSubclusterHead();
+	bool IsHierarchical();
+	void UpdateMessageString();
+	int GetMinimumClusterSize();
+
+	void ClusterStarted();
+	void ClusterDied( int deathType );
 
 protected:
 

@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for libClusterLib
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep --make-so -I/home/craig/Documents/PhD/simulations/ClusterLib/URAE/include -I/home/craig/Documents/PhD/simulations/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L/home/craig/Documents/PhD/simulations/ClusterLib/URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
+#  opp_makemake -f --deep --make-so -I/home/craig/Documents/PhD/simulations/ClusterLib/URAE/include -I/home/craig/Documents/PhD/simulations/URAE/include -I../../veins-2.0/src/base/utils -I../../veins-2.0/src/modules -I../../veins-2.0/src/base/phyLayer -I../../veins-2.0/src/modules/mobility/traci -I../../veins-2.0/src/base/connectionManager -I../../veins-2.0/src/base/modules -I../../veins-2.0/src/base/messages -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base -lmiximtestUtils -lmiximmodules -lmiximbase -KVEINS_2_0_PROJ=../../veins-2.0
 #
 
 # Name of target to be created (-o option)
@@ -25,8 +25,8 @@ INCLUDE_PATH = \
 EXTRA_OBJS =
 
 # Additional libraries (-L, -l options)
-LIBS = -L../URAE/lib -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base  -lmiximtestUtils -lmiximmodules -lmiximbase
-LIBS += -Wl,-rpath,`abspath ../URAE/lib` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/modules` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/base`
+LIBS = -L../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils -L../../veins-2.0/out/$(CONFIGNAME)/src/modules -L../../veins-2.0/out/$(CONFIGNAME)/src/base  -lmiximtestUtils -lmiximmodules -lmiximbase
+LIBS += -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/tests/testUtils` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/modules` -Wl,-rpath,`abspath ../../veins-2.0/out/$(CONFIGNAME)/src/base`
 
 # Output directory
 PROJECT_OUTPUT_DIR = ../out
@@ -35,22 +35,22 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc and .msg files
 OBJS = \
-    $O/ClusterDraw.o \
-    $O/LSUFData.o \
     $O/ClusterAnalysisScenarioManager.o \
-    $O/LowestIdCluster.o \
-    $O/RmacNetworkLayer.o \
-    $O/LSUFCluster.o \
-    $O/MdmacNetworkLayer.o \
-    $O/ClusterAlgorithm.o \
     $O/HighestDegreeCluster.o \
-    $O/MdmacControlMessage_m.o \
-    $O/RmacControlMessage_m.o
+    $O/ClusterAlgorithm.o \
+    $O/RmacNetworkLayer.o \
+    $O/LSUFData.o \
+    $O/LowestIdCluster.o \
+    $O/LSUFCluster.o \
+    $O/ClusterDraw.o \
+    $O/MdmacNetworkLayer.o \
+    $O/RmacControlMessage_m.o \
+    $O/MdmacControlMessage_m.o
 
 # Message files
 MSGFILES = \
-    MdmacControlMessage.msg \
-    RmacControlMessage.msg
+    RmacControlMessage.msg \
+    MdmacControlMessage.msg
 
 # Other makefile variables (-K)
 VEINS_2_0_PROJ=../../veins-2.0
@@ -334,6 +334,8 @@ $O/RmacControlMessage_m.o: RmacControlMessage_m.cc \
 	$(VEINS_2_0_PROJ)/src/base/utils/miximkerneldefs.h
 $O/RmacNetworkLayer.o: RmacNetworkLayer.cc \
 	ClusterAlgorithm.h \
+	ClusterAnalysisScenarioManager.h \
+	ClusterDraw.h \
 	RMACData.h \
 	RmacControlMessage_m.h \
 	RmacNetworkLayer.h \

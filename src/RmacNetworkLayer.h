@@ -111,12 +111,23 @@ public:
     /** Get a neighbour with the given id. */
     const Neighbour &GetNeighbour( const int &id );
 
+    int GetCurrentLevelCount();
+
     /*@}*/
+
 
 	int GetStateCount();
 	bool IsClusterHead();
 	bool IsSubclusterHead();
+	bool IsHierarchical();
     int GetClusterState();
+	void UpdateMessageString();
+	int GetMinimumClusterSize();
+
+	virtual void ClusterStarted();
+	virtual void ClusterMemberAdded( int id );
+	virtual void ClusterMemberRemoved( int id );
+	virtual void ClusterDied( int deathType );
 
     /**
      * Default constructor
@@ -301,9 +312,6 @@ protected:
 
     NodeIdSet mWaitingPollAcks;		/**< IDs of nodes we're awaiting poll responses from. */
 
-    simtime_t mClusterStartTime;    /**< Time at which this node last became a CH. */
-    int mCurrentMaximumClusterSize; /**< Highest number of nodes in the cluster of which we are currently head. */
-
     double mTransmitRangeSq;        /**< Transmission range, squared. */
     double mZoneOfInterest;         /**< This is double the TX range. Obtained from the PhyLayer module. */
 
@@ -356,6 +364,27 @@ protected:
 
 
     /**
+     * @name Results
+     * @brief Results to be recorded.
+     *
+     * These members record the performance of the algorithm.
+     * The following performance metrics are recorded:
+     * 		1. Cluster Depth
+     * 		   This is the maximum number of levels reached by
+     * 		   a cluster while this node has served as its head.
+     * 		   Only CHs record this.
+     * 		   Type: Scalar
+     *
+     **/
+    /*@{*/
+
+	simsignal_t mSigClusterDepth;			/**< ClusterDepth */
+
+	/*@}*/
+
+
+
+    /**
      * This implements the sorting mechanism for the Node Precidence Algorithm.
      */
     struct NPA {
@@ -365,6 +394,11 @@ protected:
 
     NodeIdSet mTemporaryClusterRecord;		/**< When a node receives a SEND_CLUSTER_PRESENCE_MESSAGE, it stores the cluster member record here. */
     NodeIdList mClusterHierarchy;			/**< List of heads of clusters within the hierarchy. This is used to prevent cyclical clusters. */
+    std::map<int,int> mLevelLookup;			/**< Lookup table of node IDs and the corresponding depth of their branches in the hierarchy. */
+    int mMaximumLevels;						/**< Length of the longest branch at this point in the hierarchy. */
+    int mCurrentLevels;						/**< The largest length this cluster has ever reached. */
+
+    void UpdateLevelOfMember( int id, NodeIdList& record, bool eraseThis=false );
 
 };
 

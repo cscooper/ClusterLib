@@ -274,7 +274,7 @@ def analyseFiles( fileList, options ):
 			if options.filePrefix:
 				baseFile = options.filePrefix
 			else:
-				m = f[0] + "-" + str(carDensity) + "cars"
+				baseFile = f[0] + "-" + str(carDensity) + "cars"
 			rouFile = baseFile + ".rou.xml"
 			print "Generating route file '" + rouFile + "'..."
 
