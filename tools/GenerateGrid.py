@@ -2,6 +2,7 @@
 
 import sys, os, subprocess, random, math, numpy, csv
 from optparse import OptionParser
+import sumolib
 
 
 sumoConfigFormat = """<?xml version="1.0" encoding="iso-8859-1"?>
@@ -107,6 +108,9 @@ def parseOptions( argv ):
 	optParser.add_option("-v",    "--minCarNumber",  dest="minVehicleNumber",   help="Minimum car density per tx range.",  type = "float", default=1 )
 	optParser.add_option("-y",    "--maxCarNumber",  dest="maxVehicleNumber",   help="Maximum car density per tx range.",  type = "float", default=10 )
 	optParser.add_option("-Y",   "--stepCarNumber", dest="stepVehicleNumber",                  help="Vehicle increment.",  type = "float", default=1 )
+	optParser.add_option("-m",    "--speedvar.min",  dest="minSpeedVariance",          help="Minimum variance in speed.",  type = "float", default=0 )
+	optParser.add_option("-M",    "--speedvar.max",  dest="maxSpeedVariance",          help="Maximum variance in speed.",  type = "float", default=0.2 )
+	optParser.add_option("-Z",   "--speedvar.step", dest="stepSpeedVariance",                help="Speed variance step.",  type = "float", default=0.05 )
 	optParser.add_option("-r",   "--transmitRange",     dest="transmitRange",         help="Vehicle transmission range.",  type = "float", default=100 )
 	optParser.add_option("-w",       "--laneWidth",         dest="laneWidth",                         help="Lane width.",  type = "float", default=2.5 )
 	optParser.add_option("-b", "--turnProbability",   dest="turnProbability",       help="Probability of a car turning.",  type = "float", default=0.5 )
@@ -190,31 +194,44 @@ def generateHighways( options ):
 	for laneCount in range( options.minLanes, options.maxLanes+1, 1 ):
 		for junctionCount in range( options.minJunction, options.maxJunction+1, 1 ):
 			for speed in range( options.minSpeed, options.maxSpeed+1, options.stepSpeed ):
-				roadLength = options.runTime * speed / ( 3.6 * ( junctionCount + 1 ) )
-				if options.filePrefix:
-					filename = options.filePrefix
-				else:
-					filename = "highway-" + str(junctionCount) + "-" + str(laneCount) + "lane-" + str(speed) + "kmph"
-				print "Generating '" + filename + "'..."
-				generateHighway( junctionCount, roadLength, laneCount, speed / 3.6, filename )
-				fileList.append( [filename, laneCount, roadLength, speed, junctionCount] )
+				for var in numpy.arange( options.minSpeedVariance, options.maxSpeedVariance+options.stepSpeedVariance/2, options.stepSpeedVariance ):
+					roadLength = options.runTime * speed / ( 3.6 * ( junctionCount + 1 ) )
+					if options.filePrefix:
+						filename = options.filePrefix
+					else:
+						filename = "highway-" + str(junctionCount) + "-" + str(laneCount) + "lane-" + str(speed) + "kmph"
+					print "Generating '" + filename + "'..."
+					generateHighway( junctionCount, roadLength, laneCount, speed / 3.6, filename )
+					fileList.append( [filename, laneCount, roadLength, speed, junctionCount, str(var)] )
 
 	return fileList
 
 
 
-def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, laneCount, speed, options ):
+def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, laneCount, speed, speedVar, options ):
 	# Load vehicle types
 	vTypes = LoadVehicleDefinitions( options.vehicleTypes )
 
 	carRate = 2 * speed * vehicleRate / ( 3.6 * options.transmitRange * laneCount )
-	with open( "tmp.trip", "w" ) as f:
+
+	if options.filePrefix:
+		tempFileName = options.filePrefix + ".trip"
+	else:
+		tempFileName = filename + "-" + str(vehicleRate) + ".trip"
+
+	# Load the highway maps
+	net = sumolib.net.readNet(filename+'.net.xml')
+
+	destinationLookup = {}
+
+	with open( tempFileName, "w" ) as f:
 		f.write( '<?xml version="1.0"?>\n' )
 
 		f.write( '<trips>\n' )
 
 		# Write the definitions
 		for t in vTypes:
+			t['speedDev'] = speedVar
 			f.write( "\t" + CreateVehicleDefinitionXML( t ) + '\n' )
 
 		genPeriod = math.ceil( 1/carRate )
@@ -247,7 +264,8 @@ def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, lan
 					else:
 						sinkEdge = str(junctionCount) + "_" + str(junctionCount+1)
 					ID += 1
-					f.write( '<trip id="car_{0}" depart="{1}" from="0_1" to="{2}" departLane="free" type="{3}" />\n'.format( ID, t, sinkEdge, PickRandomVehicleType(vTypes) ) )
+					destinationLookup["car_"+str(ID)] = [ options.maxTime ] + net.getEdge( sinkEdge )._to._coord
+					f.write( '<trip id="car_{0}" depart="{1}" from="0_1" to="{2}" departLane="free" type="{3}" departSpeed="max" />\n'.format( ID, t, sinkEdge, PickRandomVehicleType(vTypes) ) )
 				lastGen = t
 		f.write( '</trips>\n' )
 
@@ -255,9 +273,16 @@ def generateHighwayRoutes( filename, roadLength, vehicleRate, junctionCount, lan
 		outputFilename = options.filePrefix + ".rou.xml"
 	else:
 		outputFilename = filename + "-" + str(vehicleRate) + "cars.rou.xml"
-	p = subprocess.Popen( ['duarouter','-n',filename+'.net.xml','-t','tmp.trip','-o',outputFilename] )
+	p = subprocess.Popen( ['duarouter','-n',filename+'.net.xml','-t',tempFileName,'-o',outputFilename] )
 	p.wait()
-	os.remove("tmp.trip")
+	os.remove(tempFileName)
+
+	# Dump a destination lookup for each node.
+	with open(outputFilename+".dest","w") as f:
+		f.write( str( len( destinationLookup ) ) + "\n" )
+		for car in destinationLookup:
+			f.write( car + " 1\n" )
+			f.write( str( destinationLookup[car][0] ) + " " + str( destinationLookup[car][1] ) + " " + str( destinationLookup[car][2] ) + "\n" )
 
 
 def analyseFiles( fileList, options ):
@@ -279,7 +304,7 @@ def analyseFiles( fileList, options ):
 			print "Generating route file '" + rouFile + "'..."
 
 			if options.highway:
-				generateHighwayRoutes( f[0], f[2], carDensity, f[4], f[1], f[3], options )
+				generateHighwayRoutes( f[0], f[2], carDensity, f[4], f[1], f[3], f[5], options )
 
 			else:
 				genCmd = ['python',options.cbdRoutePath+'/CBDRouter.py']

@@ -77,33 +77,83 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 		if ( simType == "highway" )
 			mType = Highway;
 		else if ( simType == "grid" )
-			opp_error( "Grid simulations aren't implemented yet!" ); // mType = Grid;
+			mType = Grid;
 		else
 			opp_error( "Unknown simulation type '%s'!", simType.c_str() );
 
-		mJunctionCount = par("junctionCount").longValue();
-		mLaneCount = par("laneCount").longValue();
-		mCarSpeed = par("carSpeed").longValue();
-		mNodeDensity = par("nodeDensity").doubleValue();
-		mTurnProbability = par("turnProbability").doubleValue();
-		int seed = par("seed");
-
-		// Generate the maps.
 		char cmd[2000];
-		sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ %s -q %i > /dev/null",
-				mJunctionCount, mJunctionCount,
-				mLaneCount, mLaneCount,
-				mCarSpeed, mCarSpeed,
-				mNodeDensity, mNodeDensity,
-				mTurnProbability,
-				(const char*)par("carDefFile").stringValue(),
-				par("warmupTime").longValue(),
-				par("simulationTime").longValue(),
-				par("laneWidth").doubleValue(),
-				( mType == Highway ? "-H" : "" ),
-				seed );
+		int seed = par("seed");
+		mRunPrefix = par("filePrefix").stdstringValue();
+		mNodeDensity = par("nodeDensity").doubleValue();
 
-//		std::cerr << "Executing command: " << std::endl << cmd << std::endl;
+		if ( mType == Highway ) {
+
+			mJunctionCount = par("junctionCount").longValue();
+			mLaneCount = par("laneCount").longValue();
+			mCarSpeed = par("carSpeed").longValue();
+			mCarSpeedVariance = par("carSpeedVariance").doubleValue();
+			mTurnProbability = par("turnProbability").doubleValue();
+
+			// Generate the maps.
+			sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -m %f -M %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ %s -q %i -B %s > /dev/null",
+					mJunctionCount, mJunctionCount,
+					mLaneCount, mLaneCount,
+					mCarSpeed, mCarSpeed,
+					mNodeDensity, mNodeDensity,
+					mCarSpeedVariance, mCarSpeedVariance,
+					mTurnProbability,
+					(const char*)par("carDefFile").stringValue(),
+					par("warmupTime").longValue(),
+					par("simulationTime").longValue(),
+					par("laneWidth").doubleValue(),
+					( mType == Highway ? "-H" : "" ),
+					seed,
+					mRunPrefix.c_str() );
+
+		} else if ( mType == Grid ) {
+
+			// Get configurations
+			mBaseMap = par("baseMap").stdstringValue();
+			mNumberOfCBDs = par("cbdCount").longValue();
+
+			// Generate SUMO config file.
+			std::ofstream outputStream;
+			outputStream.open( ( std::string("./maps/") + mRunPrefix+".sumo.cfg" ).c_str() );
+			outputStream << "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>\n";
+			outputStream << "<configuration xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"http://sumo.sf.net/xsd/sumoConfiguration.xsd\">\n";
+			outputStream << "\t<input>\n";
+			outputStream << "\t\t<net-file value=\"grid.net.xml\"/>\n";
+			outputStream << "\t\t<route-files value=\"" << mRunPrefix << ".rou.xml\"/>\n";
+			outputStream << "\t</input>\n";
+			outputStream << "\t<time>\n";
+			outputStream << "\t\t<begin value=\"0\"/>\n";
+			outputStream << "\t\t<end value=\"" << par("simulationTime").longValue() << "\"/>\n";
+			outputStream << "\t\t<step-length value=\"0.1\"/>\n";
+			outputStream << "\t</time>\n";
+			outputStream << "</configuration>\n";
+			outputStream.close();
+
+			// Generate the maps.
+			sprintf( cmd, "python ./scripts/gridRouter.py -n $(pwd)/maps/%s.net.xml -o $(pwd)/maps/%s.rou.xml -v %s -N %f -u -1 -c %d -r %d -s %d > %s.router.log",
+					mBaseMap.c_str(),
+					mRunPrefix.c_str(),
+					(const char*)par("carDefFile").stringValue(),
+					mNodeDensity,
+					mNumberOfCBDs,
+					par("simulationTime").longValue(),
+					seed,
+					mRunPrefix.c_str() );
+
+//			mCheckAffiliationRecord = new cMessage();
+//			scheduleAt( simTime()+1, mCheckAffiliationRecord );
+//			mSigFaultAffiliation = registerSignal( "sigFaultAffiliation" );
+//
+//			UraeScenarioManager::initialize(stage);
+//			return;
+
+		}
+
+		std::cerr << "Executing command: " << std::endl << cmd << std::endl;
 		system(cmd);
 
 		mCheckAffiliationRecord = new cMessage();
@@ -229,11 +279,23 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 void ClusterAnalysisScenarioManager::finish() {
 
 	// clean up all the files, except the launchd file, which needs to be preserved
-	system( "rm ./maps/simFile.net*" );
-	system( "rm ./maps/simFile.rou*" );
-	system( "rm ./maps/simFile.corner.*" );
-	system( "rm ./maps/simFile.lsuf" );
-	system( "rm ./maps/simFile.sumo.*" );
+	std::string cmdBase = std::string( "rm ./maps/" ) + mRunPrefix;
+	std::string cmd;
+
+//	cmd = cmdBase + ".net.*";
+//	system( cmd.c_str() );
+//
+//	cmd = cmdBase + ".rou*";
+//	system( cmd.c_str() );
+//
+//	cmd = cmdBase + ".corner*";
+//	system( cmd.c_str() );
+//
+//	cmd = cmdBase + ".lsuf";
+//	system( cmd.c_str() );
+//
+//	cmd = cmdBase + ".sumo*";
+//	system( cmd.c_str() );
 
 	if ( mCheckAffiliationRecord->isScheduled() )
 		cancelEvent( mCheckAffiliationRecord );
@@ -252,5 +314,22 @@ void ClusterAnalysisScenarioManager::finish() {
 	UraeScenarioManager::finish();
 
 }
+
+
+
+
+inline bool fileExists(const char *filename) {
+    ifstream f(filename);
+    if (f.good()) {
+        f.close();
+        return true;
+    } else {
+        f.close();
+        return false;
+    }
+}
+
+
+
 
 

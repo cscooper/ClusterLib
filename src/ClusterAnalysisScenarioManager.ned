@@ -65,11 +65,19 @@ simple ClusterAnalysisScenarioManager
 		int simulationTime @unit(s) = default(3000s);
 		int warmupTime @unit(s) = default(1000s);
 		string simType = default("highway");
+		string filePrefix;
+		double nodeDensity = default(2);
+		
+		// Highway simulations
 		int junctionCount = default(0);
 		int laneCount = default(1);
 		int carSpeed @unit("kmph") = default(40kmph);
-		double nodeDensity = default(2);
+		double carSpeedVariance = default(0);
 		double turnProbability = default(0.1);
+
+		// Grid simulations.
+		string baseMap;
+		int cbdCount = default(1);
 
 		// Graphics display stuff
 		bool visualiser = default(false);

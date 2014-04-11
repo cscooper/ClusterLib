@@ -1,4 +1,5 @@
 //
+//
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -827,6 +828,8 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 					break;
 
 				SendInquiry();
+				if ( mInquiryTimeoutMessage->isScheduled() )
+					cancelEvent( mInquiryTimeoutMessage );
 				scheduleAt( simTime() + mInquiryPeriod, mInquiryTimeoutMessage );
 
 				break;
@@ -855,6 +858,9 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 					break;
 				}
 
+				if ( mJoinTimeoutMessage->isScheduled() )
+					cancelEvent( mJoinTimeoutMessage );
+
 				// This traps a weird error that results in a zero being put in here somewhere.
 				if ( mOneHopNeighbours.size() == 1 && mOneHopNeighbours[0] == 0 )
 					mOneHopNeighbours.clear();
@@ -882,7 +888,9 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 		    		mNeighbours.erase(mClusterHead);
 		    		mClusterHead = -1;
 		    		if ( mCurrentState == CLUSTER_MEMBER ) {
-				    	// If we're a CM, we go to the unclustered state.
+			    		if ( mProcessState == UNIFYING )
+			    			cancelEvent( mClusterUnifyTimeoutMessage );
+		    			// If we're a CM, we go to the unclustered state.
 			    		mCurrentState = UNCLUSTERED;
 			    		mProcessState = START;
 			    		returnValue = true;
@@ -1294,6 +1302,8 @@ void RmacNetworkLayer::BroadcastClusterPresence() {
  */
 void RmacNetworkLayer::RequestClusterUnification( int id ) {
 	SendControlMessage( CLUSTER_UNIFY_REQUEST_MESSAGE, id );
+	if ( mClusterUnifyTimeoutMessage->isScheduled() )
+		cancelEvent( mClusterUnifyTimeoutMessage );
 	scheduleAt( simTime()+mJoinTimeoutPeriod, mClusterUnifyTimeoutMessage );
 }
 

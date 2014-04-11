@@ -56,11 +56,15 @@ void ClusterAlgorithm::ClusterMemberRemoved( int id ) {
 void ClusterAlgorithm::ClusterDied( int deathType ) {
 
 	Coord pos = mMobility->getCurrentPosition();
-	emit( mSigClusterLifetime, simTime() - mClusterStartTime );
-	emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
-	emit( mSigClusterDeathType, (double)deathType );
-	emit( mSigClusterDeathX, pos.x );
-	emit( mSigClusterDeathY, pos.y );
+	if ( simTime() - mClusterStartTime > 2 ) {
+//		std::cerr << "STUB! " << simTime() - mClusterStartTime << " " << mCurrentMaximumClusterSize << "\n";
+		emit( mSigClusterLifetime, simTime() - mClusterStartTime );
+		emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );
+		emit( mSigClusterDeathType, (double)deathType );
+		emit( mSigClusterDeathX, pos.x );
+		emit( mSigClusterDeathY, pos.y );
+	}
+
 	mCurrentMaximumClusterSize = 0;
 	mClusterStartTime = 0;
 

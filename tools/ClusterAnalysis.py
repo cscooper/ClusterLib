@@ -6,12 +6,54 @@ from matplotlib import pyplot,lines
 import numpy, os, pickle, sys, time, itertools
 from OmnetReader import DataContainer
 
+from matplotlib import rc
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+## for Palatino and other serif fonts use:
+#rc('font',**{'family':'serif','serif':['Palatino']})
+rc('text', usetex=True)
+
+#############
+# BAR PLOTS #
+#############
+
+#
+#	Draws a bar plot:
+#	xAxis - horizontal axis labels.
+#	yAxis - a list of arrays containg the data for N number of columns.
+#	yErr  - same as above, but containing error bar info.
+def DrawBarPlot( xAxis, yAxis, yErr, yLabel, xLabel, title, labelStrings ):
+	ind = numpy.arange(len(xAxis))
+	width = 0.35
+
+	fig = pyplot.figure()
+	ax = fig.add_subplot(111)
+
+	cols = ['b','g','r','c','m','y','k','w']
+
+	rects = []
+	yN = len(yAxis)
+	for i in numpy.arange(yN):
+		rects.append( ax.bar( width*(ind*yN+i+ind), yAxis[i], width=width, color=cols[i], yerr=yErr[i], error_kw=dict(elinewidth=2,ecolor='black') ) )
+
+	ax.set_xlim( -width, width*yN*( len(ind) + 2 ) )
+	ax.set_xlabel( xLabel )
+	ax.set_ylabel( yLabel )
+	ax.set_title( title )
+	ax.set_xticks( width * ( yN * ( ind + 0.5 ) + ind ) )
+	xticknames = ax.set_xticklabels( xAxis )
+	pyplot.setp( xticknames, fontsize=16 )
+	ax.legend( ( r[0] for r in rects ), (l for l in labelStrings) )
+	ax.grid( None, axis='y' )
+
 
 
 metricPresentation = { "overhead" : "Overhead", "helloOverhead" : "Hello Overhead", "clusterLifetime" : "Cluster Lifetime" , "clusterSize" : "Cluster Size", "headChange" : "Reaffiliation", "faultAffiliation" : "Fault Affiliation", "clusterDepth" : "Cluster Depth" }
 metricUnits = { "overhead" : "B", "helloOverhead" : "B", "clusterLifetime" : "s", "clusterSize" : None, "headChange" : None }
 metricMultiplier = { "overhead" : 1, "helloOverhead" : 1, "clusterLifetime" : 1 , "clusterSize" : 1, "headChange" : 1 }
 
+algorithmPresentation = { "HighestDegreeCluster" : "HD", "LowestIdCluster" : "LID", "LSUFCluster" : "LSUF", "RmacNetworkLayer" : "RMAC" }
+parameterAbbreviation = { "Node Density" : r"$\rho_N$", "Lane Count" : "$N_L$", "Junction Count" : "$N_J$", "Speed" : "$S_{max}$" }
+parameterUnits = { "Speed" : "km/h", }
 
 ##################
 # DATA COMPILING #
@@ -55,10 +97,12 @@ def enumerateConfigs( directoryName, useTar ):
 
 # Collect the results from the given data container.
 def collectResults( dataContainer ):
-	results = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
-	counts = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0, "faultAffiliation" : 0, "clusterDepth" : 0 }
-	minima = { "overhead" : numpy.inf, "helloOverhead" : numpy.inf, "clusterLifetime" : numpy.inf, "clusterSize" : numpy.inf, "headChange" : numpy.inf, "faultAffiliation" : numpy.inf, "clusterDepth" : numpy.inf }
-	maxima = { "overhead" : 0, "helloOverhead" : 0, "clusterLifetime" : 0, "clusterSize" : 0, "headChange" : 0, "faultAffiliation" : 0, "clusterDepth" : 0 }
+	resultSums = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
+	resultCounts = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
+	resultMeans = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
+	resultVar = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
+	resultMax = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
+	scalarResults = { "overhead" : [], "helloOverhead" : [], "clusterLifetime" : [] , "clusterSize" : [], "headChange" : [], "faultAffiliation" : [], "clusterDepth" : [] }
 
 	# Get the list of scalars
 	scalarList = dataContainer.getScalarList()
@@ -70,17 +114,24 @@ def collectResults( dataContainer ):
 			continue
 
 		resName = scalarName.split(":")[0]
-		if resName not in results:
+		if resName not in scalarResults:
 			continue
 
 		scalar = dataContainer.getScalar( moduleName, scalarName )
 		if numpy.isnan( scalar.value ):
 			continue
 
-		results[resName].append( scalar.value )
-		counts[resName] += 1
-		minima[resName] = min( minima[resName], scalar.value )
-		maxima[resName] = max( maxima[resName], scalar.value )
+		scalarResults[resName].append( scalar.value )
+
+	# Get the means of these scalar results
+	for key in scalarResults:
+		if len(scalarResults[key]) == 0:
+			continue
+		resultSums[key].append( numpy.sum( scalarResults[key] ) )
+		resultCounts[key].append( len( scalarResults[key] ) )
+		resultMeans[key].append( numpy.mean( scalarResults[key] ) )
+		resultVar[key].append( numpy.var( scalarResults[key] ) )
+		resultMax[key].append( scalarResults[key] )
 
 	# Get the list of statistics
 	statisticsList = dataContainer.getStatisticsList()
@@ -92,52 +143,45 @@ def collectResults( dataContainer ):
 			continue
 
 		resName = statName.split(":")[0]
-		if resName not in results:
+		if resName not in resultMeans:
 			continue
 
 		stat = dataContainer.getStatistic( moduleName, statName )
-		if 'count' not in stat.fields or 'sum' not in stat.fields or 'max' not in stat.fields or 'min' not in stat.fields:
+		if 'mean' not in stat.fields or 'stddev' not in stat.fields or 'count' not in stat.fields or 'sum' not in stat.fields or 'max' not in stat.fields:
 			continue
 
-		if stat.fields['count'] == 0:
+		if stat.fields['count'] == 0 or stat.fields['mean'] < 2:
 			continue
 
-		results[resName].append( stat.fields['sum'] )
-		counts[resName] += stat.fields['count']
-		minima[resName] = min( minima[resName], stat.fields['min'] )
-		maxima[resName] = max( maxima[resName], stat.fields['max'] )
-
-	# For sanity check, calculate the node density against time.
-	# For this we want the position vectors of each node.
-	#carDensity = numpy.zeros(2000)
-	#carMob = [ vec[0] for vec in dataContainer.getVectorList() if "mobility" in vec[0] ]
-	#for mob in carMob:
-		#pos = dataContainer.getVector( mob, "posx" )
-		#startIndex = int(pos[ 0,1])
-		#endIndex   = int(pos[-1,1])
-		#carDensity[startIndex:endIndex] += 1
-
-	#pyplot.plot( carDensity )
-	#pyplot.title( "Run #" + str(dataContainer.getSelectedRun().runId) )
-	#pyplot.show()
-
-	colatedResults = {}
-	for key in results.iterkeys():
-		if counts[key] == 0:
-			colatedResults["Mean "    + metricPresentation[key]] = 0
-			colatedResults["Maximum " + metricPresentation[key]] = 0
-			colatedResults["Minimum " + metricPresentation[key]] = 0
-			colatedResults["Total "   + metricPresentation[key]] = 0
-			colatedResults[metricPresentation[key] + " Rate"] = 0
+		resultSums[resName].append( stat.fields['sum'] )
+		resultCounts[resName].append( stat.fields['count'] )
+		resultMeans[resName].append( stat.fields['mean'] )
+		if stat.fields['count'] == 1:
+			resultVar[resName].append( 0 )
 		else:
-			colatedResults["Mean "    + metricPresentation[key]] = numpy.sum( results[key] ) / counts[key]
-			colatedResults["Maximum " + metricPresentation[key]] = maxima[key]
-			colatedResults["Minimum " + metricPresentation[key]] = minima[key]
-			colatedResults["Total "   + metricPresentation[key]] = numpy.sum( results[key] )
-			colatedResults[metricPresentation[key] + " Rate"] = numpy.sum( results[key] ) / 1100
-#		colatedResults["Maximum Node Density"] = numpy.max( carDensity )
+			resultVar[resName].append( numpy.power( stat.fields['stddev'], 2 ) )
+		resultMax[resName].append( stat.fields['max'] )
 
-	return colatedResults
+	return (resultMeans, resultVar, resultSums, resultCounts, resultMax)
+
+
+
+def PoolMeanVar( mean, var, count ):
+	if len(mean) != len(var) or len(mean) != len(count):
+		print "NOT EQUAL LENGTHS!"
+		sys.exit(-1)
+	newMean = 0
+	newVar = 0
+	sumCount = numpy.sum(count)
+	for i in range(0,len(mean)):
+		newMean += count[i] * mean[i]
+	newMean /= sumCount
+	for i in range(0,len(var)):
+		newVar += count[i] * ( mean[i]*mean[i] + var[i] )
+	newVar /= sumCount
+	newVar -= newMean*newMean
+	return newMean, newVar
+
 
 
 
@@ -168,48 +212,107 @@ class MDMACColator:
 			retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount] = {}
 
 		# Add them to the set
-		for metric in unsortedResults:
+		for metric in unsortedResults[0]:
 			# If this metric has not been added to this configuration, add it.
-			if metric not in retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount]:
-				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric] = []
-			# Append the result to the list of metrics
-			retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric].append( results[metric] )
+			if metricPresentation[metric] not in retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount]:
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]] = [ unsortedResults[0][metric], unsortedResults[1][metric], unsortedResults[2][metric], unsortedResults[3][metric], unsortedResults[4][metric], 1 ]
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Mean "+metricPresentation[metric]] = 0
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Total "+metricPresentation[metric]] = 0
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Maximum "+metricPresentation[metric]] = 0
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]+" Rate"] = 0
+			else:
+				# Append the result to the list of metrics
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]][0] += unsortedResults[0][metric]
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]][1] += unsortedResults[1][metric]
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]][2] += unsortedResults[2][metric]
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]][3] += unsortedResults[3][metric]
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]][4] += unsortedResults[4][metric]
+				retRes[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metricPresentation[metric]][5] += 1
 
 	def GetStatistics( self, resultSet ):
-		for initialFreshness in resultSet:
-			for freshnessThreshold in resultSet[initialFreshness]:
-				for hopCount in resultSet[initialFreshness][freshnessThreshold]:
-					for metric in resultSet[initialFreshness][freshnessThreshold][hopCount]:
-						metricMean = numpy.mean( resultSet[initialFreshness][freshnessThreshold][hopCount][metric] )
-						metricStd  =  numpy.std( resultSet[initialFreshness][freshnessThreshold][hopCount][metric] )
-						metricMax  =  numpy.max( resultSet[initialFreshness][freshnessThreshold][hopCount][metric] )
-						metricMin  =  numpy.min( resultSet[initialFreshness][freshnessThreshold][hopCount][metric] )
-						resultSet[initialFreshness][freshnessThreshold][hopCount][metric] = (metricMean, metricStd, metricMax, metricMin)
-
+		removeResults = []
+		for beaconInterval in resultSet:
+			for initialFreshness in resultSet[beaconInterval]:
+				for freshnessThreshold in resultSet[beaconInterval][initialFreshness]:
+					for hopCount in resultSet[beaconInterval][initialFreshness][freshnessThreshold]:
+						for metric in resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]:
+							if "Mean" in metric or "Rate" in metric or "Total" in metric or "Maximum" in metric:
+								continue
+							removeResults.append( [beaconInterval,initialFreshness,freshnessThreshold,hopCount,metric] )
+							if len( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric] ) == 0:
+								continue
+							try:
+								metricMean, metricStd = PoolMeanVar( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][0], resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][1], resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][3] )
+								metricRate = numpy.sum( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2] ) / ( 1100 * resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5] )
+								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Mean " + metric] = (metricMean, metricStd)
+								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Total " + metric] = (numpy.sum( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2] )/resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5], 0)
+								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric+ " Rate"] = (metricRate,0)
+								if len(resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][4]) != 0:
+									resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Maximum "+metric] = ( numpy.max( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][4] ), 0 )
+							except Exception as e:
+								print "Problem obtaining statistics for '" + metric + "'"
+								print "Beacon interval =", beaconInterval
+								print "Initial freshness =", initialFreshness
+								print "Freshnes threshold =", freshnessThreshold
+								print "Hop count =", hopCount
+								raise e
+		for r in removeResults:
+			del resultSet[r[0]][r[1]][r[2]][r[3]][r[4]]
 
 
 
 class RMACColator:
 
 	def __init__(self):
-		self.precidence = []
+		self.precidence = ['Missed Pings']
 
 	def GatherResults( self, unsortedResults, runAttributes, retRes ):
 		# Add them to the set
-		for metric in unsortedResults:
+		for metric in unsortedResults[0]:
+
+			missedPings = runAttributes['missedPings']
+			if missedPings not in retRes:
+				retRes[missedPings] = {}
+
 			# If this metric has not been added to this configuration, add it.
-			if metric not in retRes:
-				retRes[metric] = []
-			# Append the result to the list of metrics
-			retRes[metric].append( unsortedResults[metric] )
+			if metricPresentation[metric] not in retRes[missedPings]:
+				retRes[missedPings][metricPresentation[metric]] = [ unsortedResults[0][metric], unsortedResults[1][metric], unsortedResults[2][metric], unsortedResults[3][metric], unsortedResults[4][metric], 1 ]
+				retRes[missedPings]["Mean "+metricPresentation[metric]] = 0
+				retRes[missedPings]["Total "+metricPresentation[metric]] = 0
+				retRes[missedPings]["Maximum "+metricPresentation[metric]] = 0
+				retRes[missedPings][metricPresentation[metric]+" Rate"] = 0
+			else:
+				# Append the result to the list of metrics
+				retRes[missedPings][metricPresentation[metric]][0] += unsortedResults[0][metric]
+				retRes[missedPings][metricPresentation[metric]][1] += unsortedResults[1][metric]
+				retRes[missedPings][metricPresentation[metric]][2] += unsortedResults[2][metric]
+				retRes[missedPings][metricPresentation[metric]][3] += unsortedResults[3][metric]
+				retRes[missedPings][metricPresentation[metric]][4] += unsortedResults[4][metric]
+				retRes[missedPings][metricPresentation[metric]][5] += 1
 
 	def GetStatistics( self, resultSet ):
-		for metric in resultSet:
-			metricMean = numpy.mean( resultSet[metric] )
-			metricStd  =  numpy.std( resultSet[metric] )
-			metricMax  =  numpy.max( resultSet[metric] )
-			metricMin  =  numpy.min( resultSet[metric] )
-			resultSet[metric] = (metricMean, metricStd, metricMax, metricMin)
+		removeResults = []
+		for missedPings in resultSet:
+			for metric in resultSet[missedPings]:
+				if "Mean" in metric or "Rate" in metric or "Total" in metric or "Maximum" in metric:
+					continue
+				removeResults.append( [missedPings,metric] )
+				if len( resultSet[missedPings][metric] ) == 0:
+					continue
+				try:
+					metricMean, metricStd = PoolMeanVar( resultSet[missedPings][metric][0], resultSet[missedPings][metric][1], resultSet[missedPings][metric][3] )
+					metricRate = numpy.sum( resultSet[missedPings][metric][2] ) / ( 1100 * resultSet[missedPings][metric][5] )
+					resultSet[missedPings]["Mean " + metric] = (metricMean, metricStd)
+					resultSet[missedPings]["Total " + metric] = (numpy.sum( resultSet[missedPings][metric][2] )/resultSet[missedPings][metric][5], 0)
+					resultSet[missedPings][metric+ " Rate"] = (metricRate,0)
+					if len(resultSet[missedPings][metric][4]) != 0:
+						resultSet[missedPings]["Maximum "+metric] = ( numpy.max( resultSet[missedPings][metric][4] ), 0 )
+				except Exception as e:
+					print "Problem obtaining statistics for '" + metric + "'"
+					print "Missed pings =", missedPings
+					raise e
+		for r in removeResults:
+			del resultSet[r[0]][r[1]]
 
 
 Colators = { "HighestDegreeCluster" : MDMACColator, "LowestIdCluster" : MDMACColator, "LSUFCluster" : MDMACColator, "RmacNetworkLayer" : RMACColator }
@@ -254,10 +357,11 @@ def dataCompile( argv ):
 
 			# Get the parameters of this run
 			runAttributes = dataContainers[config].getRunAttributes()
+			channelModel = runAttributes['channelModel']
 			algorithm = runAttributes['networkType']
+			print "Process " + options.process
 			if options.process == 'grid':
-				laneCount = int(runAttributes['laneCount'])
-				junctionCount = int(runAttributes['junctionCount'])
+				pass
 			elif options.process == 'highway':
 				laneCount = int(runAttributes['laneCount'])
 				junctionCount = int(runAttributes['junctionCount'])
@@ -274,16 +378,14 @@ def dataCompile( argv ):
 
 			if options.process == 'grid':
 				# The location data is specified by the lane count and the road length.
-				if laneCount not in resultSet:
-					resultSet[laneCount] = {}
 
-				if junctionCount not in resultSet[laneCount]:
-					resultSet[laneCount][junctionCount] = {}
+				if channelModel not in resultSet:
+					resultSet[channelModel] = {}
 
-				if algorithm not in resultSet[laneCount][junctionCount]:
-					resultSet[laneCount][junctionCount][algorithm] = {}
+				if algorithm not in resultSet[channelModel]:
+					resultSet[channelModel][algorithm] = {}
 
-				GatherResultsMDMAC( results, runAttributes, resultSet[laneCount][junctionCount][algorithm] )
+				colator.GatherResults( results, runAttributes, resultSet[channelModel][algorithm] )
 
 			elif options.process == 'highway':
 				# The location data is specified by the lane count, the road length, speed, and node density.
@@ -299,10 +401,13 @@ def dataCompile( argv ):
 				if carDensity not in resultSet[laneCount][junctionCount][speed]:
 					resultSet[laneCount][junctionCount][speed][carDensity] = {}
 
-				if algorithm not in resultSet[laneCount][junctionCount][speed][carDensity]:
-					resultSet[laneCount][junctionCount][speed][carDensity][algorithm] = {}
+				if channelModel not in resultSet[laneCount][junctionCount][speed][carDensity]:
+					resultSet[laneCount][junctionCount][speed][carDensity][channelModel] = {}
 
-				colator.GatherResults( results, runAttributes, resultSet[laneCount][junctionCount][speed][carDensity][algorithm] )
+				if algorithm not in resultSet[laneCount][junctionCount][speed][carDensity][channelModel]:
+					resultSet[laneCount][junctionCount][speed][carDensity][channelModel][algorithm] = {}
+
+				colator.GatherResults( results, runAttributes, resultSet[laneCount][junctionCount][speed][carDensity][channelModel][algorithm] )
 
 			elif options.process == 'location':
 				# The location data is specified by the name of the map
@@ -312,39 +417,43 @@ def dataCompile( argv ):
 				if junctionCount not in resultSet[location]:
 					resultSet[location] = {}
 
-				if algorithm not in resultSet[location]:
-					resultSet[location][algorithm] = {}
+				if channelModel not in resultSet[location]:
+					resultSet[location][channelModel] = {}
 
-				colator.GatherResults( results, runAttributes, resultSet[location][algorithm] )
+				if algorithm not in resultSet[location][channelModel]:
+					resultSet[location][channelModel][algorithm] = {}
+
+				colator.GatherResults( results, runAttributes, resultSet[location][channelModel][algorithm] )
 
 		# We've collected all the results, now we need to compute their means and stddevs
 		if options.process == 'grid':
-			for laneCount in resultSet:
-				for junctionCount in resultSet[laneCount]:
-					for algorithm in resultSet[laneCount][junctionCount]:
-						colator.GetStatistics( resultSet[laneCount][junctionCount][algorithm] )
+			for channelModel in resultSet:
+				for algorithm in resultSet[channelModel]:
+					colator.GetStatistics( resultSet[channelModel][algorithm] )
 
 		elif options.process == 'highway':
 			for laneCount in resultSet:
 				for junctionCount in resultSet[laneCount]:
 					for speed in resultSet[laneCount][junctionCount]:
 						for carDensity in resultSet[laneCount][junctionCount][speed]:
-							for algorithm in resultSet[laneCount][junctionCount][speed][carDensity]:
-								colator.GetStatistics( resultSet[laneCount][junctionCount][speed][carDensity][algorithm] )
+							for channelModel in resultSet[laneCount][junctionCount][speed][carDensity]:
+								for algorithm in resultSet[laneCount][junctionCount][speed][carDensity][channelModel]:
+									colator.GetStatistics( resultSet[laneCount][junctionCount][speed][carDensity][channelModel][algorithm] )
 
 		elif options.process == 'location':
 			for location in resultSet:
-				for algorithm in resultSet[location]:
-					colator.GetStatistics( resultSet[location][algorithm] )
+				for channelModel in resultSet[location]:
+					for algorithm in resultSet[location][channelModel]:
+						colator.GetStatistics( resultSet[location][algorithm] )
 
 	resultSet['settings'] = {}
 	resultSet['settings']['process'] = options.process
 	if options.process == 'grid':
-		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Algorithm']
+		resultSet['settings']['precidence'] = ['Channel Model','Algorithm']
 	elif options.process == 'highway':
-		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Speed','Node Density','Algorithm']
+		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Speed','Node Density','Channel Model','Algorithm']
 	elif options.process == 'location':
-		resultSet['settings']['precidence'] = ['Location','Algorithm']
+		resultSet['settings']['precidence'] = ['Location','Channel Model','Algorithm']
 
 
 	# We've collated all the results. Attempt to dump this to a file.
@@ -374,6 +483,7 @@ def dataCompile( argv ):
 def parseDataAnalyseOptions( argv ):
 	optParser = OptionParser()
 	optParser.add_option("-f", "--dataFile", dest="dataFile", help="Specify the compiled data file to load.")
+	optParser.add_option("-p", "--plotType", dest="plotType", help="Specify the kind of plot to use.", default="line")
 	(options, args) = optParser.parse_args(argv)
 
 	if not options.dataFile:
@@ -656,6 +766,7 @@ def gridAnalyse(resultData):
 def highwayAnalyse(resultData):
 	if 'settings' in resultData.keys():
 		precidence = resultData['settings']['precidence']
+		plotType = resultData['settings']['plotType']
 		resultData.pop('settings',None)
 
 	def obtainKeys( dat, loc, level, precidence, **kwargs ):
@@ -726,6 +837,14 @@ def highwayAnalyse(resultData):
 				break
 
 			markerIndex = 0
+
+			if plotType == "column":
+				hAxis = []
+				yAxis = []
+				yErr = []
+				labelStrings = []
+
+			yMax = 0
 			# Get the data
 			for kw in kwargSet:
 				conf = kw;
@@ -741,17 +860,41 @@ def highwayAnalyse(resultData):
 					if k in setAxes and k is not xAxis:
 						if s:
 							labelStr += "; "
-						labelStr += k + "=" + str(kw[k])
+						paramName = k
+						if k in parameterAbbreviation:
+							paramName = parameterAbbreviation[k]
+						units = ""
+						if k in parameterUnits:
+							units = parameterUnits[k]
+						labelStr += paramName + "=" + str(kw[k]) + units
 						s = True
+
 				v = [val[0] for val in vVals]
-				pyplot.plot( hVals, v, label=labelStr, marker=markers[markerIndex] )
+				verr = numpy.sqrt( [val[1] for val in vVals] ) / 2
+				yMax = max( yMax, max( [ v[i]+verr[i] for i in range(0,len(v)) ] ) )
+
+				if plotType == "column":
+					hAxis = hVals
+					yAxis.append( v )
+					yErr.append( verr )
+					labelStrings.append( labelStr )
+				elif plotType == "line":
+					pyplot.errorbar( hVals, v, verr, label=labelStr, marker=markers[markerIndex] )
+
 				markerIndex+=1
 				if markerIndex == len(markers):
 					markerIndex = 0
-			pyplot.legend(loc='best')
-			pyplot.title( metrics[0] + " vs. " + xAxis )
-			pyplot.xlabel( xAxis )
-			pyplot.ylabel( metrics[0] )
+
+			if plotType == "column":
+				DrawBarPlot( hAxis, yAxis, yErr, metrics[0], xAxis, metrics[0] + " vs. " + xAxis, labelStrings )
+			elif plotType == "line":
+				pyplot.legend(loc='best')
+				pyplot.title( metrics[0] + " vs. " + xAxis )
+				pyplot.xlabel( xAxis )
+				pyplot.ylabel( metrics[0] )
+				pyplot.ylim(0,yMax+0.5)
+				pyplot.grid( None, axis='y')
+
 			pyplot.show()
 
 
@@ -771,9 +914,11 @@ def dataAnalyse( argv ):
 	else:
 		process = 'location'
 
+	resultData['settings']['plotType'] = options.plotType
+
 	# We have the data, now let's get to analysing it.
 	if process == 'grid':
-		gridAnalyse(resultData)
+		highwayAnalyse(resultData)
 	elif process == 'highway':
 		highwayAnalyse(resultData)
 	elif process == 'location':

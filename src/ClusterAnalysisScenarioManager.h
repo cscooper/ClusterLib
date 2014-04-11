@@ -51,11 +51,19 @@ private:
 	};
 
 	SimulationType mType;
+	std::string mRunPrefix;
+	double mNodeDensity;		// Node density is common to both simulation types.
+
+	// Highway simulations.
 	int mJunctionCount;
 	int mLaneCount;
 	int mCarSpeed;
-	double mNodeDensity;
+	double mCarSpeedVariance;
 	double mTurnProbability;
+
+	// Grid simulations
+	std::string mBaseMap;
+	int mNumberOfCBDs;
 
 #ifndef NDEBUG
 	bool mVisualiser;
@@ -78,5 +86,7 @@ class ClusterAnalysisScenarioManagerAccess
 		};
 };
 
+
+inline bool fileExists(const char *filename);
 
 #endif /* CLUSTERANALYSISSCENARIOMANAGER_H_ */
