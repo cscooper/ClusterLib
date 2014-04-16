@@ -62,7 +62,7 @@ protected:
 
 	enum ClusterState {
 		Unclustered = 0,		/**< Initial state. Send out an affiliation message. */
-		NeighbourDiscovery,		/**< We've declared ourselves a CH, and start looking for our neighbours. */
+		//NeighbourDiscovery,		/**< We've declared ourselves a CH, and start looking for our neighbours. */
 		Joining,				/**< We've found a suitable CH, and are trying to join it. */
 		ClusterMember,			/**< We're a CM. */
 		ClusterHead,			/**< We're a CH. */

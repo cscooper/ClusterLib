@@ -236,7 +236,7 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 	                	mDrawer->drawLine( pos, p->GetMobilityModule()->getCurrentPosition(), ClusterDraw::Colour(1,0,0), 2 );
 				}
 
-				mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
+//				mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 			} else {
 
@@ -256,6 +256,8 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
                 }
 
 			}
+
+			mDrawer->drawString( pos + Coord(0,6), mod->GetMessageString(), ClusterDraw::Colour(0,0,0) );
 
 // 			ChannelAccess *channelAccess = FindModule<ChannelAccess*>::findSubModule(it->second);
 // 			float radius = channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();

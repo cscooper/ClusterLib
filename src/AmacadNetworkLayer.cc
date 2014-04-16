@@ -74,17 +74,23 @@ int AmacadNetworkLayer::GetMinimumClusterSize() {
 
 void AmacadNetworkLayer::UpdateMessageString() {
 
+	std::string msg;
 	switch ( mCurrentState ) {
 
-	case        Unclustered: mMessageString =        "Unclustered"; break;
-	case NeighbourDiscovery: mMessageString = "NeighbourDiscovery"; break;
-	case            Joining: mMessageString =            "Joining"; break;
-	case      ClusterMember: mMessageString =      "ClusterMember"; break;
-	case        ClusterHead: mMessageString =        "ClusterHead"; break;
-	case       Reclustering: mMessageString =       "Reclustering"; break;
-	                default: mMessageString =          "UNKNOWN!!"; break;
+	case        Unclustered: msg =        "Unclustered"; break;
+	//case NeighbourDiscovery: msg = "NeighbourDiscovery"; break;
+	case            Joining: msg =            "Joining"; break;
+	case      ClusterMember: msg =      "ClusterMember"; break;
+	case        ClusterHead: msg =        "ClusterHead"; break;
+	case       Reclustering: msg =       "Reclustering"; break;
+	                default: msg =          "UNKNOWN!!"; break;
 
 	};
+
+	std::stringstream s;
+	s << "N" << mID << ": " << msg;
+	mMessageString = s.str();
+
 }
 
 /** @brief Initialization of the module and some variables*/
@@ -142,7 +148,8 @@ void AmacadNetworkLayer::initialize( int stage ) {
 		scheduleAt( simTime() + mDestinationSet[0].mTime, mChangeDestinationMessage );
 
 		// Schedule the "update mobility" signal
-		scheduleAt( simTime() + mTimeDifference * ( 1 + rand() / (double)RAND_MAX ), mStartMessage );
+		double diff = 1 + rand() / (double)RAND_MAX;
+		scheduleAt( simTime() + mTimeDifference * diff, mStartMessage );
 
 		// Set up the first destination.
 		mCurrentDestination = mDestinationSet[0].mDestination;
@@ -224,7 +231,7 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
 
         	// Got a response to an AFFILIATION_MESSAGE.
         	// Add this to our list of nearby CHs if it is one.
-        	if ( mCurrentState == Unclustered )
+        	if ( mCurrentState == Unclustered && msg->getIsClusterHead() )
 				mClusterHeadNeighbours.push_back( msg->getNodeId() );
 
         	break;
@@ -233,89 +240,37 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
 
         	//std::cerr << "Node " << mID << ": Received HELLO message from " << msg->getNodeId() << ".\n";
 
-        	// HELLO messages come from nodes trying to start the clustering process, or from CMs checking up on their CH.
-        	if ( mCurrentState == Unclustered ) {
+        	// Respond with an ACK.
+        	SendControlMessage( HELLO_ACK_MESSAGE, msg->getNodeId() );
 
-        		// Respond with an ACK.
-            	SendControlMessage( HELLO_ACK_MESSAGE, msg->getNodeId() );
-
-            	// We're unclustered, so cancel our processing.
-        		if ( mAffiliationTimeoutMessage->isScheduled() )
-        			cancelEvent( mAffiliationTimeoutMessage );
-
-            	// The sender is our initial CH. It will decide who is the final CH and tell me.
-        		// Initial CH will work out what we want to do based on whether we already have
-        		// a CH. If we don't, then we will have set our CH id to that of the sender.
-        		// Otherwise, the mClusterHead field of our ACK packet will indicate our affiliation
-        		// with another CH.
-            	mClusterHead = msg->getNodeId();
-            	mCurrentState = ClusterMember;
-            	Process();
-            	//std::cerr << "Node " << mID << ": Temporarily joined CH " << msg->getNodeId() << ".\n";
-
-        	} else if ( msg->getDestAddr() !=  LAddress::L3BROADCAST ) {
-
-        		// Check if we're a cluster head, and the sending node is part of our cluster.
-        		if ( !mIsClusterHead && mID == msg->getClusterHead() ) {
-
-        			// We're not a CH, but the sending node thinks we are. Change its mind.
-        			std::cerr << "Node " << mID << ": Node " << msg->getNodeId() << " thinks we are it's CH. Tell it to get lost.\n";
-        			SendControlMessage( DELETE_MESSAGE, msg->getNodeId() );
-
-        		} else if ( mIsClusterHead ) {
-
-        			if ( mClusterMembers.find( msg->getNodeId() ) != mClusterMembers.end() ) {
-
-        				// This is a member of our cluster.
-        				SendControlMessage( HELLO_ACK_MESSAGE, msg->getNodeId() );
-
-        			} else {
-
-        				// This is NOT a member of our cluster.
-        				SendControlMessage( DELETE_MESSAGE, msg->getNodeId() );
-
-        			}
-
-        		}
-
-        	}
-
+        	// HELLO messages come from CHs managing the clustering process.
+        	if ( msg->getIsClusterHead() )
+				mClusterHeadNeighbours.push_back( msg->getNodeId() );
 
         	break;
 
         case HELLO_ACK_MESSAGE:
 
-        	// We got an ACK.
-        	//std::cerr << "Node " << mID << ": Received HELLO ack message from " << msg->getNodeId() << ".\n";
+        	// We got an ACK from a node.
+        	// Need to do stuff if we are a CH
+        	id = msg->getNodeId();
+        	if ( mIsClusterHead ) {
 
-        	if ( mCurrentState == NeighbourDiscovery ) {
+        		// Check if it's a member of our cluster.
+        		if ( mClusterMembers.find( id ) != mClusterMembers.end() ) {
 
-        		// Check if this node has just set us as its temporary CH.
-				id = msg->getNodeId();
-				if ( mNeighbours[id].mClusterHead == -1 ) {
+        			// Node is in our cluster. Make sure it thinks we are it's CH.
+        			if ( mNeighbours[id].mClusterHead != mID ) {
 
-					// This node is using us as a temporary CH.
-					mIsClusterHead = true;
-					mNeighbours[id].mClusterHead = mID;
-					ClusterMemberAdded( id );
-	            	//std::cerr << "Node " << mID << ": CM " << msg->getNodeId() << " using us as temporary CH.\n";
+        				// Node is NOT part of our cluster so remove it.
+        				std::cerr << "Node " << mID << ": Received HELLO ACK message from " << msg->getNodeId() << ", which we thought erroneously was a member of our cluster.\n";
+        				ClusterMemberRemoved( id );
+        				if ( mClusterMembers.size() < mMinimumDensity ) {
+        					mCurrentState = Reclustering;
+        					Process();
+        				}
 
-				}
-
-        	} else if ( mCurrentState == ClusterMember ) {
-
-        		// We just got a HELLO_ACK from our CH. Make sure it still is a CH.
-        		if ( msg->getClusterHead() != msg->getNodeId() ) {
-
-        			//std::cerr << "Node " << mID << ": Our CH (" << msg->getNodeId() << ") is a CM of " << msg->getClusterHead() << ". Joining that CH.\n";
-
-        			// What we think is our CH is a CM of another cluster.
-        			// Try to join that CH.
-        			mClusterHeadNeighbours.clear();
-        			mClusterHeadNeighbours.push_back( msg->getClusterHead() );
-        			mClusterHead = -1;
-        			mCurrentState = Joining;
-        			Process( mJoinTimeoutMessage );
+        			}
 
         		}
 
@@ -326,23 +281,29 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
         case ADD_MESSAGE:
 
         	// Received an ADD message.
+        	if ( !mIsClusterHead )
+        		break;
+
         	//std::cerr << "Node " << mID << ": Received ADD message from " << msg->getNodeId() << ".\n";
 
         	id = msg->getNodeId();
         	ClusterAnalysisScenarioManagerAccess::get()->joinMessageReceived( id, mID );
 
         	// We should check if this node is a better CH than us.
-        	if ( CalculateF() > CalculateF( id, true ) ) {
-        		// This node is better than us.
-        		ChangeCH(id);
-        	} else {
-        		// We're still best.
+//        	if ( CalculateF() > CalculateF( id, true ) ) {
+//
+//        		// This node is better than us.
+//        		ChangeCH(id);
+//
+//        	} else {
 
+        		// We're still best.
         		if ( mClusterMembers.size() < mMaximumDensity ) {
 
         			// We can accommodate this node.
 					ClusterMemberAdded( id );
 					SendControlMessage( MEMBER_ACK_MESSAGE, id );
+					std::cerr << "Node " << mID << ": Permitted node " << id << " to join cluster.\n";
 
         		} else {
 
@@ -350,10 +311,11 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
         			mClusterHead = -1;
 					SendControlMessage( MEMBER_ACK_MESSAGE, id );
 					mClusterHead = mID;
+					std::cerr << "Node " << mID << ": Denied node " << id << " to join cluster.\n";
 
         		}
 
-        	}
+//        	}
 
         	break;
 
@@ -407,21 +369,28 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
 
         case MEMBER_ACK_MESSAGE:
 
-        	//std::cerr << "Node " << mID << ": Received MEMBER ack message from " << msg->getNodeId() << ".\n";
+        	std::cerr << "Node " << mID << ": Received MEMBER ack message from " << msg->getNodeId() << ".\n";
+
+        	if ( mCurrentState != Joining )
+        		break;
 
         	// Received a response to our ADD request.
         	cancelEvent( mJoinTimeoutMessage );
 
         	if ( msg->getClusterHead() != -1 ) {
 
+        		std::cerr << "Node " << mID << ": Joined cluster " << msg->getNodeId() << ".\n";
+
         		// We've been accepted to this cluster
         		mCurrentState = ClusterMember;
 				mClusterHead = msg->getNodeId();
 
 	        	// Check the state machine.
-	        	Process();
+	        	Process( NULL );
 
         	} else {
+
+        		std::cerr << "Node " << mID << ": Denied access to cluster " << msg->getNodeId() << ".\n";
 
         		// We've been denied access to this cluster.
         		// Process the state machine with the JoinTimeoutMessage.
@@ -492,6 +461,7 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
         	// Received a warning message from one of our CMs.
         	mWarningMessageCount++;
         	if ( mWarningMessageCount > mMaximumWarningCount ) {
+        		std::cerr << "Node " << mID << ": TOO MANY WARNINGS! RECLUSTERING.\n";
         		ChangeCH();
         		Process();
         	}
@@ -562,7 +532,37 @@ void AmacadNetworkLayer::handleLowerMsg( cMessage* m ) {
 /** @brief Handle self messages */
 void AmacadNetworkLayer::handleSelfMsg(cMessage* msg) {
 
-	Process(msg);
+	UpdateMessageString();
+
+	if ( mStartMessage == msg ) {
+
+		// Time to start!
+		mInitialised = true;
+		// Schedule the "update mobility" signal
+		scheduleAt( simTime() + mTimeDifference, mUpdateMobilityMessage );
+		Process(NULL);
+
+	} else if ( mChangeDestinationMessage == msg ) {
+
+		// We have to change the destination of our vehicle.
+		if ( mDestinationSet.empty() )
+			return;
+
+		// Trigger the change in destination.
+		scheduleAt( simTime() + mDestinationSet[0].mTime, mChangeDestinationMessage );
+
+		// Set up the first destination.
+		mCurrentDestination = mDestinationSet[0].mDestination;
+
+		// Clear the current destination in anticipation of the next one.
+		mDestinationSet.erase( mDestinationSet.begin() );
+		return;
+
+	} else {
+
+		Process(msg);
+
+	}
 
 }
 
@@ -641,119 +641,10 @@ NetwPkt* AmacadNetworkLayer::encapsMsg( cPacket *appPkt ) {
  */
 void AmacadNetworkLayer::Process( cMessage *msg ) {
 
-	UpdateMessageString();
-
-	if ( mStartMessage == msg ) {
-
-		// Time to start!
-		mInitialised = true;
-		// Schedule the "update mobility" signal
+	if ( msg == mUpdateMobilityMessage )
 		scheduleAt( simTime() + mTimeDifference, mUpdateMobilityMessage );
-		msg = NULL;
-
-	} else if ( mChangeDestinationMessage == msg ) {
-
-		// We have to change the destination of our vehicle.
-		if ( mDestinationSet.empty() )
-			return;
-
-		// Trigger the change in destination.
-		scheduleAt( simTime() + mDestinationSet[0].mTime, mChangeDestinationMessage );
-
-		// Set up the first destination.
-		mCurrentDestination = mDestinationSet[0].mDestination;
-
-		// Clear the current destination in anticipation of the next one.
-		mDestinationSet.erase( mDestinationSet.begin() );
-		return;
-
-	} else if ( mUpdateMobilityMessage == msg ) {
-
-		// Decrement the warning counter if we're CH
-		if ( mIsClusterHead ) {
-			if ( (--mWarningMessageCount) < 0 )
-				mWarningMessageCount = 0;
-//			std::cerr << "Node " << mID << ": Size = " << mClusterMembers.size() << ".\n";
-		}
-
-		// Schedule the "update mobility" signal
-		scheduleAt( simTime() + mTimeDifference, mUpdateMobilityMessage );
-
-		if ( mClusterHead != -1 ) {			// If we are actually a member of a cluster.
-
-			double currSpeed = mMobility->getCurrentSpeed().length();
-			if ( !mIsClusterHead ) {
-
-				// Update the mobility.
-				double currSpeed = mMobility->getCurrentSpeed().length();
-				if ( fabs( currSpeed - mLastSpeed ) > mSpeedThreshold )
-					SendControlMessage( WARNING_MESSAGE, mClusterHead );
-				else
-					SendControlMessage( HELLO_MESSAGE, mClusterHead );
-
-			}
-
-			mLastSpeed = currSpeed;
-
-			// Now check our neighbour table for outdated data
-//			std::cerr << "Node " << mID << ": Purging old members. Number of neighbours = " << mNeighbours.size() << ".\n";
-//			std::cerr << "Node " << mID << ": Neighbours - ";
-			bool hadMembers = ( mClusterMembers.size() >= mMinimumDensity ) && mIsClusterHead;
-			NodeIdList nodesToRemove;
-			for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ ) {
-
-//				std::cerr << it->first << " ";
-				simtime_t diff = simTime() - it->second.mLastHeard;
-//				if ( mID == 9 )
-//					std::cerr << "Node " << mID << ": Data on Node " << it->first << " is " << diff.dbl() << " seconds old. Dies in " << (mTimeToLive - diff).dbl() << " seconds.\n";
-				if ( diff > mTimeToLive ) {
-
-					nodesToRemove.push_back( it->first );
-					if ( mIsClusterHead && mClusterMembers.find( it->first ) != mClusterMembers.end() ) {
-
-						// We've lost one of our CMs, so remove it from the list. Trigger reclustering if we don't have enough members.
-						ClusterMemberRemoved( it->first );
-
-					} else if ( mCurrentState == ClusterMember || mClusterHead == it->first ) {
-
-						// We've lost contact with our CH, so look for a new one.
-						mCurrentState = Unclustered;
-						mClusterHead = -1;
-						mInitialised = false;	// Force this function to continue.
-						msg = NULL;
-
-					}
-
-				}
-
-			}
-
-			for ( NodeIdList::iterator it = nodesToRemove.begin(); it != nodesToRemove.end(); it++ )
-				mNeighbours.erase( *it );
-
-			if ( hadMembers && mClusterMembers.size() < mMinimumDensity ) {
-				//std::cerr << "Node " << mID << ": Going to reclustering. " << mIsClusterHead << "\n";
-				mCurrentState = Reclustering;
-				mInitialised = false;
-				msg = NULL;
-			}
-
-//			std::cerr << "\n";
-//			std::cerr << "Node " << mID << ": Number of neighbours = " << mNeighbours.size() << ".\n";
-
-		}
-
-		if ( mInitialised )
-			return;	// If we've initialised, then we don't need to do anything more.
-
-		// Otherwise, set the initialised flag and begin the processing loop.
-		mInitialised = true;
-		msg = NULL;
-
-	}
 
 	bool processComplete = false;
-	int ret;
 
 	while ( !processComplete ) {
 
@@ -770,6 +661,7 @@ void AmacadNetworkLayer::Process( cMessage *msg ) {
 					if ( mClusterHeadNeighbours.empty() ) {
 
 						// Send out affiliation message.
+						std::cerr << "Node " << mID << ": Sending out AFFILIATION MESSAGE.\n";
 						SendControlMessage( AFFILIATION_MESSAGE );
 						scheduleAt( simTime() + mTimeoutPeriod, mAffiliationTimeoutMessage );
 
@@ -778,79 +670,33 @@ void AmacadNetworkLayer::Process( cMessage *msg ) {
 						// We have CHs nearby. Ask to join them.
 						mCurrentState = Joining;
 						processComplete = false;
+						msg = mJoinTimeoutMessage;
 
 					}
 
 
 				} else if ( msg == mAffiliationTimeoutMessage ) {
 
+					std::cerr << "Node " << mID << ": Affiliation timeout.\n";
 					// Check if we got any CHs.
 					if ( !mClusterHeadNeighbours.empty() ) {
 
 						// We have CHs nearby. Ask to join them.
+						std::cerr << "Node " << mID << ": Found " << mClusterHeadNeighbours.size() << " CHs in range. Joining!\n";
 						mCurrentState = Joining;
 						msg = mJoinTimeoutMessage;
 
 					} else {
 
 						// No CHs nearby, so start the clustering process!
-						mCurrentState = NeighbourDiscovery;
+						std::cerr << "Node " << mID << ": No CHs in range.\n";
+						mCurrentState = ClusterHead;
 						mIsClusterHead = true;
 						mClusterHead = mID;		// Set ourselves as CH.
 						mWarningMessageCount = 0;
-
-					}
-					processComplete = false;
-					msg = NULL;
-
-				}
-
-				break;
-
-			case NeighbourDiscovery:
-
-				if ( !msg ) {
-
-					// Send out the HELLO message.
-					SendControlMessage( HELLO_MESSAGE );
-					scheduleAt( simTime() + mTimeoutPeriod, mInquiryTimeoutMessage );
-
-				} else if ( msg == mInquiryTimeoutMessage ) {
-
-					// We've collected ACK responses.
-
-					//std::cerr << "Node " << mID << ": Got INQ timeout.\n";
-
-					// TODO: Contingency plan in case mClusterMembers.size < mMinimumDensity.
-					// TODO: Something along the lines of finding a neighbour with the larger neighbour table.
-
-					// Look through the list of members we've collected.
-					// We calculate each node's aggregate Fv score and elect the lowest score as the CH.
-					ret = ComputeNeighbourScores();
-
-					// Check if we have the best score.
-					if ( ret != mID ) {
-
-						// We don't have the best score.
-						// Tell the best scorer to become CH, and tell the other CMs to join it.
-						// Then we become CM of the new CH.
-						SendControlMessage( CLUSTERHEAD_ACK_MESSAGE, ret );
-
-						mCurrentState = ClusterMember;
-						mIsClusterHead = false;
-						mClusterHead = ret;
-
-						for ( NodeIdSet::iterator it = mClusterMembers.begin(); it != mClusterMembers.end(); it++ )
-							if ( *it != ret )
-								SendControlMessage( MEMBER_UPDATE_MESSAGE, *it );
-						mClusterMembers.clear();
-
-					} else {
-
-						// We are the CH
-						mCurrentState = ClusterHead;
-						ClusterStarted();
-			        	//std::cerr << "Node " << mID << ": Became CH.\n";
+						// Send out a HELLO message to get things moving.
+						SendControlMessage( HELLO_MESSAGE );
+						msg = NULL;
 
 					}
 					processComplete = false;
@@ -866,6 +712,8 @@ void AmacadNetworkLayer::Process( cMessage *msg ) {
 					if ( !mClusterHeadNeighbours.empty() ) {
 
 						// Ask to join one of the CHs nearby.
+		        		std::cerr << "Node " << mID << ": Requesting to join " << mClusterHeadNeighbours[0] << ".\n";
+
 						SendControlMessage( ADD_MESSAGE, mClusterHeadNeighbours[0] );
 						ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mID, mClusterHeadNeighbours[0] );
 						mClusterHeadNeighbours.erase( mClusterHeadNeighbours.begin() );
@@ -873,7 +721,8 @@ void AmacadNetworkLayer::Process( cMessage *msg ) {
 
 					} else {
 
-						// Change the state to unclustered.
+						// Change the state to unclustered and look for more CHs
+						std::cerr << "Node " << mID << ": No CHs responded! Going back to Unclustered.\n";
 						mCurrentState = Unclustered;
 						processComplete = false;
 						msg = NULL;
@@ -885,7 +734,123 @@ void AmacadNetworkLayer::Process( cMessage *msg ) {
 				break;
 
 			case ClusterMember:
+
+				if ( msg == mUpdateMobilityMessage ) {
+
+					// Check if our mobility has significantly changed.
+					double currSpeed = mMobility->getCurrentSpeed().length();
+					if ( fabs( currSpeed - mLastSpeed ) > mSpeedThreshold )
+						SendControlMessage( WARNING_MESSAGE, mClusterHead );
+
+					mLastSpeed = currSpeed;
+
+					// Now check our neighbour table for outdated data
+					bool lostCH = false;
+					NodeIdList nodesToRemove;
+					for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ ) {
+
+						simtime_t diff = simTime() - it->second.mLastHeard;
+						if ( diff > mTimeToLive ) {
+							// Mark this node for deletion
+							nodesToRemove.push_back( it->first );
+							lostCH = lostCH || ( mClusterHead == it->first );
+						}
+
+					}
+
+					// Delete marked nodes.
+					for ( NodeIdList::iterator it = nodesToRemove.begin(); it != nodesToRemove.end(); it++ )
+						mNeighbours.erase( *it );
+
+					if ( lostCH ) {
+
+						// We lost our CH, so find a new one.
+			    		std::cerr << "Node " << mID << ": Lost CH " << mClusterHead << ".\n";
+
+						mCurrentState = Unclustered;
+						mClusterHead = -1;
+						processComplete = false;
+
+					}
+
+				}
+
+				break;
+
 			case ClusterHead:
+
+				if ( msg == mUpdateMobilityMessage ) {
+
+					//std::cerr << "Node " << mID << ": ClusterHead update mobility message.\n";
+
+					// Send out a HELLO beacon.
+					SendControlMessage( HELLO_MESSAGE );
+
+					// Decrement warning message counts.
+					if ( (--mWarningMessageCount) < 0 )
+						mWarningMessageCount = 0;
+
+					// Now check our neighbour table for outdated data
+					NodeIdList nodesToRemove;
+					bool lostMembers = false;
+					for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ ) {
+
+						simtime_t diff = simTime() - it->second.mLastHeard;
+						if ( diff > mTimeToLive ) {
+							// Mark this node for deletion
+							nodesToRemove.push_back( it->first );
+							// We've lost contact with our CH, so look for a new one.
+							if ( mClusterMembers.find( it->first ) != mClusterMembers.end() ) {
+								mClusterMembers.erase( it->first );
+								lostMembers = true;
+							}
+						}
+
+					}
+
+					// Delete marked nodes.
+					for ( NodeIdList::iterator it = nodesToRemove.begin(); it != nodesToRemove.end(); it++ )
+						mNeighbours.erase( *it );
+
+					// Check if we've lost all our members.
+					if ( lostMembers && mClusterMembers.size() < mMinimumDensity ) {
+
+						// Perform reclustering.
+						mCurrentState = Reclustering;
+						processComplete = false;
+						msg = NULL;
+						continue;
+
+					}
+
+
+					// Check how many CHs are in range.
+					CollectClusterHeadNeighbours();
+					if ( !mClusterHeadNeighbours.empty() ) {
+
+						// Check if the number of clusters is too high
+						if ( mClusterHeadNeighbours.size() > mMaximumClusterDensity ) {
+
+							// Perform reclustering
+							mCurrentState = Reclustering;
+							processComplete = false;
+							msg = NULL;
+
+						} else if ( mClusterMembers.empty() ) {
+
+							// We don't have any members! Let's join another CH.
+							mCurrentState = Unclustered;
+							mIsClusterHead = false;
+							mClusterHead = -1;
+							processComplete = false;
+							msg = NULL;
+
+						}
+
+					}
+
+				}
+
 				break;
 
 			case Reclustering:
@@ -921,12 +886,10 @@ void AmacadNetworkLayer::Process( cMessage *msg ) {
 					if ( mClusterHeadNeighbours.empty() ) {
 
 						// No more neighbours, so see whether we should change the CH.
-						//std::cerr << "Node " << mID << ": Deciding to change CH.\n";
 						ChangeCH();
 
 					} else {
 
-						//std::cerr << "Node " << mID << ": Sending reclustering message to " << mClusterHeadNeighbours[0] << ".\n";
 						// We have to send a RECLUSTERING message to the first CH.
 						SendControlMessage( RECLUSTERING_MESSAGE, mClusterHeadNeighbours[0] );
 						mClusterHeadNeighbours.erase( mClusterHeadNeighbours.begin() );
@@ -1154,15 +1117,19 @@ double AmacadNetworkLayer::CalculateF( int id, bool notThis ) {
 
 		if ( notThis ) {
 
-			for ( NodeIdSet::iterator it = mClusterMembers.begin(); it != mClusterMembers.end(); it++ ) {
-				dL = ( mNeighbours[id].mPosition - mNeighbours[*it].mPosition ).length();
-				dS = fabs( mNeighbours[id].mSpeed - mNeighbours[*it].mSpeed );
-				dD = ( mNeighbours[id].mDestination - mNeighbours[*it].mDestination ).length();
+			// Compute the F value between all our neighbours and the given neighbour.
+			for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ ) {
+				if ( id == it->first )
+					continue;
+				dL = ( mNeighbours[id].mPosition - it->second.mPosition ).length();
+				dS = fabs( mNeighbours[id].mSpeed - it->second.mSpeed );
+				dD = ( mNeighbours[id].mDestination - it->second.mDestination ).length();
 				ret += dL * mWeights[0] + dS * mWeights[1] + dD * mWeights[2];
 			}
 
 		} else {
 
+			// Compute the F value between us and the given ID
 			dL = ( mNeighbours[id].mPosition - mMobility->getCurrentPosition() ).length();
 			dS = fabs( mNeighbours[id].mSpeed - mMobility->getCurrentSpeed().length() );
 			dD = ( mNeighbours[id].mDestination - mCurrentDestination ).length();
@@ -1172,10 +1139,11 @@ double AmacadNetworkLayer::CalculateF( int id, bool notThis ) {
 
 	} else {
 
-		for ( NodeIdSet::iterator it = mClusterMembers.begin(); it != mClusterMembers.end(); it++ ) {
-			dL = ( mNeighbours[*it].mPosition - mMobility->getCurrentPosition() ).length();
-			dS = fabs( mNeighbours[*it].mSpeed - mMobility->getCurrentSpeed().length() );
-			dD = ( mNeighbours[*it].mDestination - mCurrentDestination ).length();
+		// Compute our F value.
+		for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ ) {
+			dL = ( it->second.mPosition - mMobility->getCurrentPosition() ).length();
+			dS = fabs( it->second.mSpeed - mMobility->getCurrentSpeed().length() );
+			dD = ( it->second.mDestination - mCurrentDestination ).length();
 			ret += dL * mWeights[0] + dS * mWeights[1] + dD * mWeights[2];
 		}
 
@@ -1200,6 +1168,21 @@ int AmacadNetworkLayer::ComputeNeighbourScores() {
 
 	// Then find a CM that beats us.
 	for ( NodeIdSet::iterator it = mClusterMembers.begin(); it != mClusterMembers.end(); it++ ) {
+
+		// Calculate this CMs score with respect to the other CMs.
+		double currScore = CalculateF( *it, true );
+		if ( currScore < bestScore ) {
+
+			// We have a new best scorer.
+			bestScore = currScore;
+			bestID = *it;
+
+		}
+
+	}
+
+	// Then find a neighbouring CH that beats us.
+	for ( NodeIdList::iterator it = mClusterHeadNeighbours.begin(); it != mClusterHeadNeighbours.end(); it++ ) {
 
 		// Calculate this CMs score with respect to the other CMs.
 		double currScore = CalculateF( *it, true );
