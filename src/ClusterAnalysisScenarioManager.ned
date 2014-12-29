@@ -43,6 +43,7 @@ simple ClusterAnalysisScenarioManager
         double penetrationRate = default(1); //the probability of a vehicle being equipped with Car2X technology
 
 		@statistic[faultAffiliation]( source = "count(sigFaultAffiliation)"; record = last; title = "Fault Affiliations"; );
+		@statistic[faultAffiliationAck]( source = "count(sigFaultAffiliationAck)"; record = last; title = "Fault Affiliation Acknowledgements"; );
 
 		// Urae stuff
 		string linksFile = default("");

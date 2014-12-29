@@ -26,6 +26,7 @@ void ClusterAlgorithm::ClusterStarted() {
 
 	mCurrentMaximumClusterSize = mClusterMembers.size();
 	mClusterStartTime = simTime();
+//	std::cerr << mId << ": Cluster Started!\n";
 
 }
 
@@ -57,6 +58,7 @@ void ClusterAlgorithm::ClusterDied( int deathType ) {
 
 	Coord pos = mMobility->getCurrentPosition();
 	if ( simTime() - mClusterStartTime > 2 ) {
+//		std::cerr << mId << ": Cluster died! L = " << simTime() - mClusterStartTime << "; S = " << mCurrentMaximumClusterSize << "\n";
 //		std::cerr << "STUB! " << simTime() - mClusterStartTime << " " << mCurrentMaximumClusterSize << "\n";
 		emit( mSigClusterLifetime, simTime() - mClusterStartTime );
 		emit( mSigClusterSize, (double)mCurrentMaximumClusterSize );

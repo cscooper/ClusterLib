@@ -29,20 +29,24 @@ public:
 	ClusterAnalysisScenarioManager();
 	virtual ~ClusterAnalysisScenarioManager();
 
-	void joinMessageSent( int srcId, int destId );
-	void joinMessageReceived( int srcId, int destId );
+	void joinMessageSent( int srcId, int destId, bool isAck = false );
+	void joinMessageReceived( int srcId, int destId, bool isAck = false );
 
 	virtual void initialize(int stage);
 	virtual void handleSelfMsg( cMessage *m );
 	virtual void finish();
+
+	double getSimulationTime() { return mSimulationTime; }
 
 private:
 	typedef std::pair<int,int> SrcDestPair;
 	typedef std::map<SrcDestPair,float> AffiliationMap;
 
 	AffiliationMap mAffiliationRecord;
+	AffiliationMap mAffiliationAckRecord;	// We need to check if an ACK was properly received upon affiliation
 	cMessage *mCheckAffiliationRecord;
 	simsignal_t mSigFaultAffiliation;
+	simsignal_t mSigFaultAffiliationAck;
 
 	// simulation parameters
 	enum SimulationType {
@@ -53,6 +57,7 @@ private:
 	SimulationType mType;
 	std::string mRunPrefix;
 	double mNodeDensity;		// Node density is common to both simulation types.
+	double mSimulationTime;		// Simulation Time
 
 	// Highway simulations.
 	int mJunctionCount;

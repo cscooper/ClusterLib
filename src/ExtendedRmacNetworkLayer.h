@@ -18,13 +18,14 @@
 
 #include <BaseNetwLayer.h>
 
+#include "CarMobility.h"
 #include "ClusterAlgorithm.h"
 
 /**
  * This module implements the clustering mechanism for Robust
- * Mobility-Aware Clustering (RMAC).
+ * Mobility-Aware Clustering (RMAC). I've made my own extensions.
  */
-class RmacNetworkLayer : public ClusterAlgorithm {
+class ExtendedRmacNetworkLayer : public ClusterAlgorithm, public StatusChangeListener {
 
 public:
 
@@ -37,6 +38,7 @@ public:
         JOIN_MESSAGE,                                 /**< Join a CH. */
         JOIN_RESPONSE_MESSAGE,                        /**< Response to permit a node to join a cluster. */
         JOIN_DENIAL_MESSAGE,                          /**< Response to deny a node to join a cluster. */
+        JOIN_SUGGEST_MESSAGE,						  /**< Response to suggest an inquiring node join another CH. */
         POLL_MESSAGE,								  /**< A poll message. */
         POLL_ACK_MESSAGE,							  /**< A poll acknowledgement message. */
         SEND_CLUSTER_PRESENCE_MESSAGE,				  /**< Order edge nodes to send CLUSTER_PRESENCE_MESSAGE. */
@@ -62,20 +64,22 @@ public:
      * @brief Contains an entry in the neighbour table.
      */
     struct Neighbour {
-        unsigned int mId;                   /**< Identifier of the neighbour. */
-        LAddress::L3Type mNetworkAddress;   /**< The IP address of this neighbour. */
-        Coord mPosition;                    /**< Position of the neighbour. */
-        Coord mVelocity;                    /**< Velocity of the neighbour. */
-        bool mIsClusterHead;				/**< Whether this node is a CH or CHM. */
-        unsigned int mClusterHead;			/**< ID of the node's CH. */
-        unsigned int mConnectionCount;      /**< Number of connections this node now has. */
-        unsigned int mHopCount;             /**< Number of hops this neighbour is from this node. */
-        simtime_t mTimeStamp;               /**< Last time this entry was updated. */
-        unsigned int mProviderId;           /**< Identifier of the node that last provided this information. */
-        double mDistanceToNode;             /**< Distance from this node to this neighbour. */
-        double mLinkExpirationTime;         /**< Time until this link expires due to mobility. */
-        int mMissedPings;					/**< Number of times this neighbour has missed a ping. */
-        RmacNetworkLayer *mDataOwner;		/**< Owner of this data. */
+        unsigned int mId;                   	/**< Identifier of the neighbour. */
+        LAddress::L3Type mNetworkAddress;   	/**< The IP address of this neighbour. */
+        Coord mPosition;                    	/**< Position of the neighbour. */
+        Coord mVelocity;                    	/**< Velocity of the neighbour. */
+        bool mIsClusterHead;					/**< Whether this node is a CH or CHM. */
+        unsigned int mClusterHead;				/**< ID of the node's CH. */
+        unsigned int mConnectionCount;      	/**< Number of connections this node now has. */
+        unsigned int mHopCount;             	/**< Number of hops this neighbour is from this node. */
+        simtime_t mTimeStamp;               	/**< Last time this entry was updated. */
+        unsigned int mProviderId;           	/**< Identifier of the node that last provided this information. */
+        double mDistanceToNode;             	/**< Distance from this node to this neighbour. */
+        double mLinkExpirationTime;         	/**< Time until this link expires due to mobility. */
+        int mMissedPings;						/**< Number of times this neighbour has missed a ping. */
+        unsigned int mRouteSimilarity;			/**< How similar this node's route is to ours. */
+        double mLossProbability;				/**< The probability that the last message received from this node could have been lost. */
+        ExtendedRmacNetworkLayer *mDataOwner;	/**< Owner of this data. */
     };
 
     /**
@@ -132,7 +136,7 @@ public:
     /**
      * Default constructor
      */
-    RmacNetworkLayer() {  }
+    ExtendedRmacNetworkLayer() {  }
 
     /** @brief Initialization of the module and some variables*/
     virtual void initialize(int);
@@ -162,7 +166,7 @@ protected:
     virtual void handleSelfMsg(cMessage* msg);
 
     /** @brief decapsulate higher layer message from RmacControlMessage */
-    virtual cMessage* decapsMsg(RmacControlMessage*);
+    virtual cMessage* decapsMsg(ExtendedRmacControlMessage*);
 
     /** @brief Encapsulate higher layer packet into a RmacControlMessage */
     virtual NetwPkt* encapsMsg(cPacket*);
@@ -216,7 +220,7 @@ protected:
     /**
      * @brief Determines whether a nearby cluster is disjoint (true) or connected (false).
      */
-    bool EvaluateClusterPresence( RmacControlMessage *m );
+    bool EvaluateClusterPresence( ExtendedRmacControlMessage *m );
 
     /**
      * @brief Send an control message
@@ -298,9 +302,30 @@ protected:
     double CalculateLinkExpirationTime( Coord pos, Coord vel );
 
     /**
+     * @brief Calculate the loss probability of a node.
+     * @param[in] a Parameter A of the channel's Rice distribution.
+     * @param[in] sigma Parameter Sigma of the channel's Rice distribution.
+     * @param[in] dSq Square of distance from the neighbour to this node.
+     * @return The probability that the last received message could have been lost.
+     */
+
+    double CalculateLossProbability( double a, double sigma, double dSq );
+
+
+    /**
+     * @brief Calculate the route similarity of a node.
+     * @param[in] r Route of the node.
+     * @return The number of consecutive route links this node has in common with ours.
+     */
+
+    int CalculateRouteSimilarity( Route &r );
+
+
+
+    /**
      * Update neighbour data with the given message.
      */
-    void UpdateNeighbour( RmacControlMessage *m );
+    void UpdateNeighbour( ExtendedRmacControlMessage *m );
 
     /*@}*/
 
@@ -317,6 +342,7 @@ protected:
 
     bool mInitialised;              /**< Set to true if the init function has been called. */
 
+//    Route mThisRoute;				/**< The route of this node. */
 
     /**
      * @name Messages
@@ -337,6 +363,7 @@ protected:
     cMessage *mPollPeriodFinishedMessage;		/**< Message to signify end of poll period. */
     cMessage *mClusterPresenceBeaconMessage;	/**< Message to trigger beaconing of CLUSTER_PRESENCE. */
     cMessage *mClusterUnifyTimeoutMessage;		/**< Scheduled for timeout of a unify request. */
+    cMessage *mPrepareForSimulationEnd;		/**< Signal to log results before simulation ends. */
 
     /*@}*/
 
@@ -359,8 +386,11 @@ protected:
     double mPollInterval;					/**< Period for CHs polling  */
     double mPollTimeout;					/**< If a CM doesn't hear a POLL from the CH in this time, it departs the cluster. */
     unsigned int mMissedPingThreshold;		/**< Number of pings a node will miss before it is considered gone. */
+    unsigned int mRouteSimilarityThreshold;	/**< Number of links in a route that will be compared. */
+    double mCriticalLossProbability;		/**< The highest loss probability before a CM connection is considered dead. */
 
     /*@}*/
+
 
 
     /**
@@ -382,14 +412,12 @@ protected:
 
 	/*@}*/
 
-
-
     /**
      * This implements the sorting mechanism for the Node Precidence Algorithm.
      */
-    struct NPA {
+    struct ExtendedNPA {
     	bool operator()( const int&, const int& );
-    	RmacNetworkLayer *mClient;
+    	ExtendedRmacNetworkLayer *mClient;
     };
 
     NodeIdSet mTemporaryClusterRecord;		/**< When a node receives a SEND_CLUSTER_PRESENCE_MESSAGE, it stores the cluster member record here. */
@@ -399,6 +427,20 @@ protected:
     int mCurrentLevels;						/**< The largest length this cluster has ever reached. */
 
     void UpdateLevelOfMember( int id, NodeIdList& record, bool eraseThis=false );
+
+	int mReaffiliationCount;
+
+
+	/**
+	 * @name StatusChangeListener
+	 * @brief Implementation of the StatusChangeListener class.
+	 **/
+	/*@{*/
+
+	void LaneChanged( int newLane );
+	void CrossedIntersection( std::string roadId );
+
+	/*@}*/
 
 };
 

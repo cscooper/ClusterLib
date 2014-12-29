@@ -27,7 +27,9 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.1330811776" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
 								<option id="gnu.cpp.compiler.option.include.paths.1333869578" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ClusterLib/URAE/include}&quot;"/>
-									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/URAE/include"/>
+									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/veins-2.0/src/modules/mac"/>
+									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/veins-2.0/src/modules/utility"/>
+									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/veins-2.0/src/modules/messages"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1299318983" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -51,7 +53,6 @@
 							<tool id="cdt.managedbuild.tool.gnu.assembler.base.709254888" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.base">
 								<option id="gnu.both.asm.option.include.paths.982303244" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ClusterLib/URAE/include}&quot;"/>
-									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/URAE/include"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.1959376453" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -90,6 +91,9 @@
 								<option id="gnu.cpp.compiler.option.include.paths.106700917" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/ClusterLib/URAE/include}&quot;"/>
 									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/URAE/include"/>
+									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/veins-2.0/src/modules/mac"/>
+									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/veins-2.0/src/modules/utility"/>
+									<listOptionValue builtIn="false" value="/home/craig/Documents/PhD/simulations/veins-2.0/src/modules/messages"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1552269712" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -136,5 +140,7 @@
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.omnetpp.cdt.OmnetppGCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="refreshScope" versionNumber="1">
+		<resource resourceType="PROJECT" workspacePath="/ClusterLib"/>
+	</storageModule>
 </cproject>

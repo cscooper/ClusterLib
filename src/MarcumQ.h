@@ -13,34 +13,16 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-cplusplus {{
-#include "NetwPkt_m.h"
+#ifndef __MARCUM_Q
+#define __MARCUM_Q
 
-typedef std::list<std::string> StringList;
-}}
-packet NetwPkt;
 
-class noncobject StringList;
 
-//
-// Describes the M-DMAC cluster control message.
-// Extends the NetwPkt, so this can be used to encapsulate
-// application layer packets as well.
-//
-packet MdmacControlMessage extends NetwPkt {
+/**
+ * This computes the Marcum Q function
+ */
+double MarcumQ( double a, double b, int M = 1 );
 
-	int nodeId;
-	double weight;
-	bool isClusterHead;
-	double xPosition;
-	double yPosition;
-	double xVelocity;
-	double yVelocity;
-	string roadId;
-	string laneId;
-	double xDestination;
-	double yDestination;
-	StringList route;
-	int targetNodeId;	// ID of the CH I wish to join (used for JOIN_MESSAGE type)
 
-}
+
+#endif /* #ifndef __MARCUM_Q */

@@ -54,7 +54,7 @@ void MdmacNetworkLayer::initialize(int stage)
     	mInitialised = false;
 
     	// set up the node.
-    	mID = getId();
+    	mId = getId();
     	mWeight = calculateWeight();
     	mMobility = FindModule<BaseMobility*>::findSubModule(findHost());
     	mClusterHead = -1;
@@ -87,10 +87,11 @@ void MdmacNetworkLayer::initialize(int stage)
     	WATCH( mWeight );
     	WATCH( mClusterHead );
 
+	mIncludeDestination = false;
 
 //     	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
 //     	char strNodeName[50];
-//     	sprintf( strNodeName, "node%i_conn", mID );
+//     	sprintf( strNodeName, "node%i_conn", mId );
 //     	std::list<Coord> points;
 //     	points.push_back( mMobility->getCurrentPosition() );
 //     	pManager->commandAddPolygon( strNodeName, "clusterConn", TraCIScenarioManager::Color( 255, 0, 0, 255 ), true, 5, points );
@@ -117,10 +118,10 @@ void MdmacNetworkLayer::finish() {
 
 // 	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
 // 	char strNodeName[10];
-// 	sprintf( strNodeName, "node%i_conn", mID );
+// 	sprintf( strNodeName, "node%i_conn", mId );
 // 	pManager->commandRemovePolygon( strNodeName, 5 );
 
-	//std::cerr << "Node " << mID << " deleted.\n";
+	//std::cerr << "Node " << mId << " deleted.\n";
 	ClusterAlgorithm::finish();
 
 }
@@ -321,6 +322,24 @@ double MdmacNetworkLayer::calculateWeight() {
 
 
 
+/** Add the destination data to a packet. */
+int MdmacNetworkLayer::AddDestinationData( MdmacControlMessage *pkt ) {
+
+	error( "MdmacNetworkLayer::AddDestinationData MUST be overloaded to specify destination!" );
+	return 0;
+
+}
+
+
+
+/** Store the destination data from a packet. */
+void MdmacNetworkLayer::StoreDestinationData( MdmacControlMessage *pkt ) {
+
+	error( "MdmacNetworkLayer::StoreDestinationData MUST be overloaded to specify destination!" );
+
+}
+
+
 
 /** @brief Initiate clustering. */
 void MdmacNetworkLayer::init() {
@@ -337,9 +356,9 @@ void MdmacNetworkLayer::init() {
 
 		// this node is the best CH around, so declare it
 		mIsClusterHead = true;
-		mClusterHead = mID;
+		mClusterHead = mId;
 		mClusterMembers.clear();
-		mClusterMembers.insert( mID );
+		mClusterMembers.insert( mId );
 		mCurrentMaximumClusterSize = 1;
 		sendClusterMessage( CH_MESSAGE );
 
@@ -349,9 +368,9 @@ void MdmacNetworkLayer::init() {
 		mIsClusterHead = false;
 		mClusterHead = nMax;
 		mClusterMembers.clear();
-    	//std::cerr << "Node: " << mID << " joined CH!: " << nMax << "\n";
+    	//std::cerr << "Node: " << mId << " joined CH!: " << nMax << "\n";
 		sendClusterMessage( JOIN_MESSAGE, nMax );
-		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent(mID, nMax);
+		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent(mId, nMax);
 
 	}
 
@@ -394,7 +413,7 @@ void MdmacNetworkLayer::processBeat() {
 
 // 	TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
 // 	char strNodeName[10];
-// 	sprintf( strNodeName, "node%i_conn", mID );
+// 	sprintf( strNodeName, "node%i_conn", mId );
 // 
 // 	std::list<Coord> points;
 // 	points.push_back( mMobility->getCurrentPosition() );
@@ -523,7 +542,7 @@ void MdmacNetworkLayer::receiveHelloMessage( MdmacControlMessage *m ) {
 		mClusterMembers.clear();
 		mClusterHead = m->getNodeId();
 		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
-		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mID, m->getNodeId() );
+		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mId, m->getNodeId() );
 
 	}
 
@@ -552,7 +571,7 @@ void MdmacNetworkLayer::receiveChMessage( MdmacControlMessage *m ) {
 		mClusterMembers.clear();
 		mClusterHead = m->getNodeId();
 		sendClusterMessage( JOIN_MESSAGE, m->getNodeId() );
-		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mID, m->getNodeId() );
+		ClusterAnalysisScenarioManagerAccess::get()->joinMessageSent( mId, m->getNodeId() );
 
 	} else {
 
@@ -591,7 +610,7 @@ void MdmacNetworkLayer::receiveJoinMessage( MdmacControlMessage *m ) {
 	if ( mIsClusterHead ) {
 
 		bool sizeChanged = false;
-		if ( m->getTargetNodeId() == mID ) {
+		if ( m->getTargetNodeId() == mId ) {
 
 			ClusterMemberAdded( m->getNodeId() );
 			mClusterMembers.insert( m->getNodeId() );
@@ -599,7 +618,7 @@ void MdmacNetworkLayer::receiveJoinMessage( MdmacControlMessage *m ) {
 			if ( mClusterMembers.size() == 2 ) {
 				ClusterStarted();
 			}
-			ClusterAnalysisScenarioManagerAccess::get()->joinMessageReceived( m->getNodeId(), mID );
+			ClusterAnalysisScenarioManagerAccess::get()->joinMessageReceived( m->getNodeId(), mId );
 
 		} else if ( mClusterMembers.find( m->getNodeId() ) != mClusterMembers.end() ) {
 
@@ -638,6 +657,12 @@ void MdmacNetworkLayer::updateNeighbour( MdmacControlMessage *m ) {
 	mNeighbours[m->getNodeId()].mPosition.y = m->getYPosition();
 	mNeighbours[m->getNodeId()].mVelocity.x = m->getXVelocity();
 	mNeighbours[m->getNodeId()].mVelocity.y = m->getYVelocity();
+
+	if ( mIncludeDestination ) {
+		StoreDestinationData( m );
+		//std::cerr << "Dest(" << m->getNodeId() << ") = (" << m->getXDestination() << "," << m->getYDestination() << ")\n";
+	}
+
 	calculateFreshness( m->getNodeId() );
 
 }
@@ -650,16 +675,24 @@ void MdmacNetworkLayer::sendClusterMessage( int kind, int dest, int nHops ) {
 
     coreEV <<"sending cluster control message...\n";
 
+	int packetSize = 432;
+
 	MdmacControlMessage *pkt = new MdmacControlMessage( "cluster-ctrl", kind );
-    pkt->setBitLength(432);	// size of the control packet packet.
+
+	if ( mIncludeDestination ) {
+		packetSize += AddDestinationData( pkt );
+		//std::cerr << "My dest = (" << mCurrentDestination.x << "," << mCurrentDestination.y << ")\n";
+	}
+
+    pkt->setBitLength(packetSize);	// size of the control packet packet.
 
     if ( kind != HELLO_MESSAGE )
-    	emit( mSigOverhead, 432 );
+    	emit( mSigOverhead, packetSize );
     else
-    	emit( mSigHelloOverhead, 432 );
+    	emit( mSigHelloOverhead, packetSize );
 
     // fill the cluster control fields
-    pkt->setNodeId( mID );
+    pkt->setNodeId( mId );
     pkt->setWeight( mWeight );
     if ( nHops == -1 )
     	nHops = mHopCount;

@@ -132,8 +132,6 @@ void RmacNetworkLayer::ClusterStarted() {
 
 	ClusterAlgorithm::ClusterStarted();
 	mCurrentLevels = 0;
-        if ( mPollTriggerMessage->isScheduled() )
-       		cancelEvent( mPollTriggerMessage );
 	scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
 	scheduleAt( simTime() + mPollInterval*4, mClusterPresenceBeaconMessage );
 
@@ -487,8 +485,6 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         	if ( mWaitingPollAcks.empty() ) {
         		// All nodes ACK'd
         		cancelEvent( mPollPeriodFinishedMessage );
-                        if ( mPollTriggerMessage->isScheduled() )
-                                cancelEvent( mPollTriggerMessage );
         		scheduleAt( simTime()+mPollInterval, mPollTriggerMessage );
         	}
 
@@ -618,8 +614,6 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         		// We've been asked to be a CH. So add this node to our list.
         		if ( mCurrentState == CLUSTER_MEMBER ) {
         			mCurrentState = CLUSTER_HEAD_MEMBER;
-	                        if ( mPollTriggerMessage->isScheduled() )
-        	                        cancelEvent( mPollTriggerMessage );
         			scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
         		}
         		ClusterMemberAdded( m->getNodeId() );
@@ -698,8 +692,6 @@ void RmacNetworkLayer::handleSelfMsg(cMessage* msg) {
     	mWaitingPollAcks.clear();
 
     	if ( mCurrentState == CLUSTER_HEAD_MEMBER || mCurrentState == CLUSTER_HEAD ) {
-                if ( mPollTriggerMessage->isScheduled() )
-                	cancelEvent( mPollTriggerMessage );
     		scheduleAt( simTime()+mPollInterval, mPollTriggerMessage );
     	}
     }

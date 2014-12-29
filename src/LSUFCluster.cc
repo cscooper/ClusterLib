@@ -95,7 +95,7 @@ double LSUFCluster::calculateWeight() {
 	float laneWeight;
 	unsigned char flow;
 	if ( !LSUFCluster::mLaneWeightData->getLaneWeight( mRoadID+"_"+mLaneID, &laneWeight, &flow ) )
-		opp_error( "Tried to get weight for an unknown lane '%s' for current node #%d", (mRoadID+"_"+mLaneID).c_str(), mID );
+		opp_error( "Tried to get weight for an unknown lane '%s' for current node #%d", (mRoadID+"_"+mLaneID).c_str(), mId );
 
 	/*
 	 * Now that we have the weight, we have to iterate through the neighbour table.

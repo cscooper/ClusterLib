@@ -53,6 +53,7 @@ public:
 	};
 
 
+    typedef std::list<std::string> RouteLinkList;
 
 	struct Neighbour {
 		double mWeight;						/**< Weight of this node. */
@@ -60,20 +61,25 @@ public:
 		Coord mVelocity;					/**< Velocity of the Neighbour. */
 		std::string mRoadID;				/**< The ID of the road this car is on. */
 		std::string mLaneID;				/**< The ID of the lane this car is on. */
+		Coord mDestination;					/**< The node's destination. */
+		RouteLinkList mRouteLinks;			/**< The next N links in this neighbour's route. */
 		bool mIsClusterHead;				/**< Is this node a CH? */
 		unsigned int mFreshness;			/**< How long this node will stay in range of this neighbour. Measured in beats. */
 	};
 
 protected:
 
+
 	typedef std::map<unsigned int,Neighbour> NeighbourSet;
 	typedef std::map<unsigned int,Neighbour>::iterator NeighbourIterator;
 
-	unsigned int mID;						/**< Node's unique ID. */
+	//unsigned int mID;						/**< Node's unique ID. */
 	double mWeight;							/**< Weight of this node. */
 
 	std::string mRoadID;					/**< The ID of the road this car is on. */
 	std::string mLaneID;					/**< The ID of the lane this car is on. */
+
+	bool mIncludeDestination;				/**< Include the destination in the HELLO messages. */
 
 	bool mIsClusterHead;					/**< Is this node a CH? */
 	NeighbourSet mNeighbours;				/**< The set of neighbours near this node. */
@@ -161,7 +167,13 @@ protected:
     /** @brief Compute the CH weight for this node. */
     virtual double calculateWeight();
 
-    /**
+	/** Add the destination data to a packet. */
+	virtual int AddDestinationData( MdmacControlMessage *pkt );
+
+	/** Store the destination data from a packet. */
+	virtual void StoreDestinationData( MdmacControlMessage *pkt );
+
+	/**
      * @name Cluster Methods
      * @brief Methods handling the formation and maintenance of clusters.
      *

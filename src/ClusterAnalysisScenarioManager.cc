@@ -35,16 +35,24 @@ ClusterAnalysisScenarioManager::~ClusterAnalysisScenarioManager() {
 
 
 
-void ClusterAnalysisScenarioManager::joinMessageSent( int srcId, int destId ) {
+void ClusterAnalysisScenarioManager::joinMessageSent( int srcId, int destId, bool isAck ) {
 
-	mAffiliationRecord[ SrcDestPair(srcId,destId) ] = simTime().dbl();
+	if ( isAck )
+		mAffiliationAckRecord[ SrcDestPair(srcId,destId) ] = simTime().dbl();
+	else
+		mAffiliationRecord[ SrcDestPair(srcId,destId) ] = simTime().dbl();
 
 }
 
 
-void ClusterAnalysisScenarioManager::joinMessageReceived( int srcId, int destId ) {
+void ClusterAnalysisScenarioManager::joinMessageReceived( int srcId, int destId, bool isAck ) {
 
-	mAffiliationRecord.erase( SrcDestPair(srcId,destId) );
+	if ( isAck ) {
+		mAffiliationAckRecord.erase( SrcDestPair(srcId,destId) );
+		//std::cerr << "Fault Ack removed " << srcId << "," << destId << "\n";
+	} else {
+		mAffiliationRecord.erase( SrcDestPair(srcId,destId) );
+	}
 
 }
 
@@ -95,7 +103,7 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 			mTurnProbability = par("turnProbability").doubleValue();
 
 			// Generate the maps.
-			sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -m %f -M %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ %s -q %i -B %s > /dev/null",
+			sprintf( cmd, "python ./scripts/GenerateGrid.py -d $(pwd)/maps/ -j %d -J %d -L %d -l %d -a %d -A %d -v %f -y %f -m %f -M %f -b %f -V $(pwd)/%s -S %d -t %d -w %f -p $(pwd)/scripts/ -c $(pwd)/scripts/ %s -q %i -B %s > %s.router.log",
 					mJunctionCount, mJunctionCount,
 					mLaneCount, mLaneCount,
 					mCarSpeed, mCarSpeed,
@@ -108,6 +116,7 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 					par("laneWidth").doubleValue(),
 					( mType == Highway ? "-H" : "" ),
 					seed,
+					mRunPrefix.c_str(),
 					mRunPrefix.c_str() );
 
 		} else if ( mType == Grid ) {
@@ -156,9 +165,12 @@ void ClusterAnalysisScenarioManager::initialize(int stage) {
 		std::cerr << "Executing command: " << std::endl << cmd << std::endl;
 		system(cmd);
 
+		mSimulationTime = par("simulationTime").longValue();
+
 		mCheckAffiliationRecord = new cMessage();
 		scheduleAt( simTime()+1, mCheckAffiliationRecord );
 		mSigFaultAffiliation = registerSignal( "sigFaultAffiliation" );
+		mSigFaultAffiliationAck = registerSignal( "sigFaultAffiliationAck" );
 
 	}
 	UraeScenarioManager::initialize(stage);
@@ -170,6 +182,7 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 
 	if ( m == mCheckAffiliationRecord ) {
 
+		// Check the Affiliation record.
 		std::vector<SrcDestPair> pairsToErase;
 		for ( AffiliationMap::iterator it = mAffiliationRecord.begin(); it != mAffiliationRecord.end(); it++ ) {
 			if ( fabs( it->second - simTime().dbl() ) > 1 ) {
@@ -180,6 +193,19 @@ void ClusterAnalysisScenarioManager::handleSelfMsg( cMessage *m ) {
 
 		for ( std::vector<SrcDestPair>::iterator it = pairsToErase.begin(); it != pairsToErase.end(); it++ )
 			mAffiliationRecord.erase( *it );
+
+		// Check the Affiliation Acknowledgement record.
+		pairsToErase.clear();
+		for ( AffiliationMap::iterator it = mAffiliationAckRecord.begin(); it != mAffiliationAckRecord.end(); it++ ) {
+			if ( fabs( it->second - simTime().dbl() ) > 1 ) {
+				emit( mSigFaultAffiliationAck, 1 );
+				//std::cerr << "Fault Ack: " << it->first.first << " to " << it->first.second << "\n";
+				pairsToErase.push_back( it->first );
+			}
+		}
+
+		for ( std::vector<SrcDestPair>::iterator it = pairsToErase.begin(); it != pairsToErase.end(); it++ )
+			mAffiliationAckRecord.erase( *it );
 
 		scheduleAt( simTime()+1, mCheckAffiliationRecord );
 
@@ -284,20 +310,20 @@ void ClusterAnalysisScenarioManager::finish() {
 	std::string cmdBase = std::string( "rm ./maps/" ) + mRunPrefix;
 	std::string cmd;
 
-//	cmd = cmdBase + ".net.*";
-//	system( cmd.c_str() );
-//
-//	cmd = cmdBase + ".rou*";
-//	system( cmd.c_str() );
-//
-//	cmd = cmdBase + ".corner*";
-//	system( cmd.c_str() );
-//
-//	cmd = cmdBase + ".lsuf";
-//	system( cmd.c_str() );
-//
-//	cmd = cmdBase + ".sumo*";
-//	system( cmd.c_str() );
+	cmd = cmdBase + ".net.*";
+	system( cmd.c_str() );
+
+	cmd = cmdBase + ".rou*";
+	system( cmd.c_str() );
+
+	cmd = cmdBase + ".corner*";
+	system( cmd.c_str() );
+
+	cmd = cmdBase + ".lsuf";
+	system( cmd.c_str() );
+
+	cmd = cmdBase + ".sumo*";
+	system( cmd.c_str() );
 
 	if ( mCheckAffiliationRecord->isScheduled() )
 		cancelEvent( mCheckAffiliationRecord );

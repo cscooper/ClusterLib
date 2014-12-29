@@ -38,7 +38,7 @@ Define_Module(LowestIdCluster);
 /** @brief Compute the CH weight for this node. */
 double LowestIdCluster::calculateWeight() {
 
-	return -mID;
+	return -mId;
 
 }
 

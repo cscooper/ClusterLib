@@ -24,7 +24,7 @@
 #include "AddressingInterface.h"
 #include "SimpleAddress.h"
 #include "FindModule.h"
-#include "RmacControlMessage_m.h"
+#include "ExtendedRmacControlMessage_m.h"
 #include "ArpInterface.h"
 #include "NetwToMacControlInfo.h"
 #include "BaseMobility.h"
@@ -35,15 +35,21 @@
 #include "TraCIMobility.h"
 
 #include "ClusterAnalysisScenarioManager.h"
-#include "RmacNetworkLayer.h"
+#include "ExtendedRmacNetworkLayer.h"
 #include "RMACData.h"
 
+#include "UraeMacLayer.h"
+#include "CarMobility.h"
 
-Define_Module(RmacNetworkLayer);
+#include "MarcumQ.h"
 
 
 
-std::ostream& operator<<( std::ostream& os, const RmacNetworkLayer::Neighbour& n ) {
+Define_Module(ExtendedRmacNetworkLayer);
+
+
+
+std::ostream& operator<<( std::ostream& os, const ExtendedRmacNetworkLayer::Neighbour& n ) {
 
 	os << "Pos = " << n.mPosition << "; Vel = " << n.mVelocity << "; Connection = " << n.mConnectionCount;
 	return os;
@@ -59,59 +65,59 @@ std::ostream& operator<<( std::ostream& os, const RmacNetworkLayer::Neighbour& n
 /*@{*/
 
 /** Get maximum cluster size. */
-unsigned int RmacNetworkLayer::GetConnectionLimits() {
+unsigned int ExtendedRmacNetworkLayer::GetConnectionLimits() {
 	return mConnectionLimits;
 }
 
 
 /** Get distance threshold. */
-double RmacNetworkLayer::GetDistanceThreshold() {
+double ExtendedRmacNetworkLayer::GetDistanceThreshold() {
 	return mDistanceThreshold;
 }
 
 
-double RmacNetworkLayer::GetTimeThreshold() {
+double ExtendedRmacNetworkLayer::GetTimeThreshold() {
 	return mTimeThreshold;
 }
 
 
 /** Get a neighbour with the given id. */
-const RmacNetworkLayer::Neighbour &RmacNetworkLayer::GetNeighbour( const int &id ) {
+const ExtendedRmacNetworkLayer::Neighbour &ExtendedRmacNetworkLayer::GetNeighbour( const int &id ) {
 	return mNeighbours[id];
 }
 
 
-int RmacNetworkLayer::GetCurrentLevelCount() {
+int ExtendedRmacNetworkLayer::GetCurrentLevelCount() {
 	return mMaximumLevels;
 }
 
 
-int RmacNetworkLayer::GetStateCount() {
+int ExtendedRmacNetworkLayer::GetStateCount() {
 	return CLUSTER_HEAD_MEMBER+1;
 }
 
 
-bool RmacNetworkLayer::IsClusterHead() {
+bool ExtendedRmacNetworkLayer::IsClusterHead() {
 	return mCurrentState == CLUSTER_HEAD || mCurrentState == CLUSTER_HEAD_MEMBER;
 }
 
 
-bool RmacNetworkLayer::IsSubclusterHead() {
+bool ExtendedRmacNetworkLayer::IsSubclusterHead() {
 	return mCurrentState == CLUSTER_HEAD_MEMBER;
 }
 
 
-bool RmacNetworkLayer::IsHierarchical() {
+bool ExtendedRmacNetworkLayer::IsHierarchical() {
 	return true;
 }
 
 
-int RmacNetworkLayer::GetClusterState() {
+int ExtendedRmacNetworkLayer::GetClusterState() {
 	return mCurrentState;
 }
 
 
-void RmacNetworkLayer::UpdateMessageString() {
+void ExtendedRmacNetworkLayer::UpdateMessageString() {
     char s[100];
     static bool b = true;
     sprintf( s, "%i %i %s", mId, mMaximumLevels, (b?"!":"*") );
@@ -120,7 +126,7 @@ void RmacNetworkLayer::UpdateMessageString() {
 }
 
 
-int RmacNetworkLayer::GetMinimumClusterSize() {
+int ExtendedRmacNetworkLayer::GetMinimumClusterSize() {
 	return 0;
 }
 
@@ -128,19 +134,21 @@ int RmacNetworkLayer::GetMinimumClusterSize() {
 /*@}*/
 
 
-void RmacNetworkLayer::ClusterStarted() {
+void ExtendedRmacNetworkLayer::ClusterStarted() {
 
 	ClusterAlgorithm::ClusterStarted();
 	mCurrentLevels = 0;
-        if ( mPollTriggerMessage->isScheduled() )
-       		cancelEvent( mPollTriggerMessage );
+	if ( mPollTriggerMessage->isScheduled() )
+		cancelEvent( mPollTriggerMessage );
 	scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
+        if ( mClusterPresenceBeaconMessage->isScheduled() )
+                cancelEvent( mClusterPresenceBeaconMessage );
 	scheduleAt( simTime() + mPollInterval*4, mClusterPresenceBeaconMessage );
 
 }
 
 
-void RmacNetworkLayer::ClusterMemberAdded( int id ) {
+void ExtendedRmacNetworkLayer::ClusterMemberAdded( int id ) {
 
 	ClusterAlgorithm::ClusterMemberAdded(id);
 	// TODO: Assess changes to hierarchy and propagate them.
@@ -152,7 +160,7 @@ void RmacNetworkLayer::ClusterMemberAdded( int id ) {
 
 
 
-void RmacNetworkLayer::ClusterMemberRemoved( int id ) {
+void ExtendedRmacNetworkLayer::ClusterMemberRemoved( int id ) {
 
 	ClusterAlgorithm::ClusterMemberRemoved(id);
 	// Assess changes to hierarchy and propagate them.
@@ -162,7 +170,7 @@ void RmacNetworkLayer::ClusterMemberRemoved( int id ) {
 }
 
 
-void RmacNetworkLayer::ClusterDied( int deathType ) {
+void ExtendedRmacNetworkLayer::ClusterDied( int deathType ) {
 
 	ClusterAlgorithm::ClusterDied(deathType);
 	// TODO: CLUSTER HAS DIED! Record data.
@@ -191,7 +199,7 @@ void RmacNetworkLayer::ClusterDied( int deathType ) {
 
 
 /** @brief Initialization of the module and some variables. */
-void RmacNetworkLayer::initialize(int stage)
+void ExtendedRmacNetworkLayer::initialize(int stage)
 {
     ClusterAlgorithm::initialize(stage);
 
@@ -209,6 +217,14 @@ void RmacNetworkLayer::initialize(int stage)
         mZoneOfInterest = 2 * channelAccess->getConnectionManager( channelAccess->getParentModule() )->getMaxInterferenceDistance();
         mTransmitRangeSq = pow( mZoneOfInterest/2, 2 );
 
+		dynamic_cast<CarMobility*>(mMobility)->SetListener(this);
+
+//        // Get the route of this car.
+//		TraCIScenarioManager *pManager = TraCIScenarioManagerAccess().get();
+//		std::string myId = dynamic_cast<TraCIMobility*>(mMobility)->getExternalId();
+//		std::string myRouteId = pManager->commandGetRouteId( myId );
+//		mThisRoute = pManager->commandGetRouteEdgeIds( myRouteId );
+
         // get parameters
         mConnectionLimits = par("connectionLimits").longValue();
         mDistanceThreshold = par("distanceThreshold").doubleValue();
@@ -219,6 +235,8 @@ void RmacNetworkLayer::initialize(int stage)
         mPollInterval = par("pollInterval").doubleValue();
         mPollTimeout = par("pollTimeout").doubleValue();
         mMissedPingThreshold = par("missedPingThreshold").longValue();
+        mRouteSimilarityThreshold = par("routeSimilarityThreshold").longValue();
+        mCriticalLossProbability = par("criticalLossProbability").doubleValue();
 
         // Setup messages
         // Phase 1 clustering messages
@@ -237,10 +255,17 @@ void RmacNetworkLayer::initialize(int stage)
         mClusterPresenceBeaconMessage = new cMessage( "clusterPresence" );
         mClusterUnifyTimeoutMessage = new cMessage( "unifyTimeout" );
 
+	// Simulation Finish Messages
+//	mPrepareForSimulationEnd = new cMessage( "simulationEnd" );
+
         // schedule the start message
       	scheduleAt( simTime() + float(rand()) / RAND_MAX, mFirstTimeProcess );
 
+//	ClusterAnalysisScenarioManager *manager = ClusterAnalysisScenarioManagerAccess::get();
+//	scheduleAt( manager->getSimulationTime()-0.1, mPrepareForSimulationEnd );
+
       	mMaximumLevels = mCurrentLevels = 0;
+	mReaffiliationCount = 0;
 
 		// set up result collection
 		mSigClusterDepth = registerSignal( "sigClusterDepth" );
@@ -258,7 +283,7 @@ void RmacNetworkLayer::initialize(int stage)
 
 
 /** @brief Cleanup*/
-void RmacNetworkLayer::finish() {
+void ExtendedRmacNetworkLayer::finish() {
 
 	if ( IsClusterHead() )
 		ClusterDied( CD_Attrition );
@@ -313,7 +338,7 @@ void RmacNetworkLayer::finish() {
 
 
 /** @brief Handle messages from upper layer */
-void RmacNetworkLayer::handleUpperMsg(cMessage* msg) {
+void ExtendedRmacNetworkLayer::handleUpperMsg(cMessage* msg) {
 
     assert(dynamic_cast<cPacket*>(msg));
     NetwPkt *m = encapsMsg(static_cast<cPacket*>(msg));
@@ -324,11 +349,11 @@ void RmacNetworkLayer::handleUpperMsg(cMessage* msg) {
 
 
 /** @brief Handle messages from lower layer */
-void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
+void ExtendedRmacNetworkLayer::handleLowerMsg(cMessage* msg) {
 
 	bool deleteMsg = true;
 	int role = -1;
-    RmacControlMessage *m = static_cast<RmacControlMessage *>(msg);
+    ExtendedRmacControlMessage *m = static_cast<ExtendedRmacControlMessage *>(msg);
     coreEV << " handling packet from " << m->getSrcAddr() << std::endl;
 
     // Update the data for the neighbour this came from.
@@ -483,12 +508,14 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         case POLL_ACK_MESSAGE:
 
         	mWaitingPollAcks.erase(id);
+			if ( mNeighbours[id].mMissedPings > 0 )
+				std::cerr << mId << ": Cluster Member " << id << " missed " << mNeighbours[id].mMissedPings << " pings before reconnecting.\n";
         	mNeighbours[id].mMissedPings = 0;
         	if ( mWaitingPollAcks.empty() ) {
         		// All nodes ACK'd
         		cancelEvent( mPollPeriodFinishedMessage );
-                        if ( mPollTriggerMessage->isScheduled() )
-                                cancelEvent( mPollTriggerMessage );
+			if ( mPollTriggerMessage->isScheduled() )
+		                cancelEvent( mPollTriggerMessage );
         		scheduleAt( simTime()+mPollInterval, mPollTriggerMessage );
         	}
 
@@ -618,8 +645,8 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         		// We've been asked to be a CH. So add this node to our list.
         		if ( mCurrentState == CLUSTER_MEMBER ) {
         			mCurrentState = CLUSTER_HEAD_MEMBER;
-	                        if ( mPollTriggerMessage->isScheduled() )
-        	                        cancelEvent( mPollTriggerMessage );
+					if ( mPollTriggerMessage->isScheduled() )
+						cancelEvent( mPollTriggerMessage );
         			scheduleAt( simTime() + mPollInterval, mPollTriggerMessage );
         		}
         		ClusterMemberAdded( m->getNodeId() );
@@ -630,7 +657,7 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
         		else if ( mCurrentState == CLUSTER_MEMBER )
         			ClusterStarted();
         		else if ( mCurrentState == CLUSTER_HEAD )
-        			scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
+					scheduleAt( simTime() + mPollTimeout, mPollTimeoutMessage );
         		mCurrentState = CLUSTER_HEAD_MEMBER;
         		mClusterHead = m->getNodeId();
         	}
@@ -664,13 +691,30 @@ void RmacNetworkLayer::handleLowerMsg(cMessage* msg) {
 
 
 /** @brief Handle self messages */
-void RmacNetworkLayer::handleSelfMsg(cMessage* msg) {
+void ExtendedRmacNetworkLayer::handleSelfMsg(cMessage* msg) {
 
 	if ( msg == mFirstTimeProcess )
 		Process();
 
     if ( msg == mInquiryTimeoutMessage || msg == mInquiryResponseTimeoutMessage || msg == mJoinTimeoutMessage || msg == mPollTimeoutMessage || msg == mClusterUnifyTimeoutMessage )
         Process( msg );
+
+//     if ( msg == mPrepareForSimulationEnd ) {
+// 
+// 		std::cerr << mId << ": Simulation shutting down.";
+// 		switch( mCurrentState ) {
+// 			case UNCLUSTERED: std::cerr << " Unclustered.\n"; break;
+// 			case CLUSTER_MEMBER: std::cerr << " CM. CH=" << mClusterHead << "\n"; break;
+// 			case CLUSTER_HEAD: std::cerr << " CH.\n"; break;
+// 			case CLUSTER_HEAD_MEMBER: std::cerr << " CHM. CH=" << mClusterHead << "\n"; break;
+// 		};
+// 		emit( mSigHeadChange, (int)mReaffiliationCount );
+// 		if ( IsClusterHead() ) {
+// //			std::cerr << mId << ": Simulation shutting down.\n";
+// 			ClusterDied( CD_Attrition );
+// 		}
+// 
+//     }
 
     if ( msg == mPollTriggerMessage )
     	PollClusterMembers();
@@ -687,19 +731,35 @@ void RmacNetworkLayer::handleSelfMsg(cMessage* msg) {
     	// Check for nodes that have not responded
 		//std::cerr << mId << ": Poll Period finished!\n";
     	for ( NodeIdSet::iterator it = mWaitingPollAcks.begin(); it != mWaitingPollAcks.end(); it++ ) {
-    		// Increment the missed ping counter.
-    		mNeighbours[*it].mMissedPings++;
-    		if ( mNeighbours[*it].mMissedPings >= (int)mMissedPingThreshold ) {
+
+			// Increment the missed ping counter.
+			mNeighbours[*it].mMissedPings++;
+
+			bool routeDiverged = false, highLossProb = false, tooManyMisses = false;
+
+			// First, check if we've crossed an intersection last we heard this guy.
+			if ( mNeighbours[*it].mTimeStamp <= dynamic_cast<CarMobility*>(mMobility)->getTOLIC() ) {
+				// We crossed an intersection since we last heard this node.
+				// If the route similarity was 1, then we've diverged from this node's path and we've lost it.
+				routeDiverged = ( mNeighbours[*it].mRouteSimilarity <= 1 );
+			}
+
+			// Check if the loss probability (scaled by missed ping count) is greater than the critical threshold.
+			highLossProb = ( mNeighbours[*it].mMissedPings*mNeighbours[*it].mLossProbability >= mCriticalLossProbability );
+
+			// Check if we've missed too many pings.
+			tooManyMisses = ( mNeighbours[*it].mMissedPings >= mMissedPingThreshold );
+
+			if ( routeDiverged || highLossProb || tooManyMisses ) {
 				// Remove from both the neighbour table and the cluster
 				mNeighbours.erase(*it);
 				ClusterMemberRemoved(*it);
-    		}
+			}
+
     	}
     	mWaitingPollAcks.clear();
 
     	if ( mCurrentState == CLUSTER_HEAD_MEMBER || mCurrentState == CLUSTER_HEAD ) {
-                if ( mPollTriggerMessage->isScheduled() )
-                	cancelEvent( mPollTriggerMessage );
     		scheduleAt( simTime()+mPollInterval, mPollTriggerMessage );
     	}
     }
@@ -707,8 +767,8 @@ void RmacNetworkLayer::handleSelfMsg(cMessage* msg) {
 }
 
 
-/** @brief decapsulate higher layer message from RmacControlMessage */
-cMessage* RmacNetworkLayer::decapsMsg( RmacControlMessage *msg ) {
+/** @brief decapsulate higher layer message from ExtendedRmacControlMessage */
+cMessage* ExtendedRmacNetworkLayer::decapsMsg( ExtendedRmacControlMessage *msg ) {
 
     cMessage *m = msg->decapsulate();
     setUpControlInfo(m, msg->getSrcAddr());
@@ -720,15 +780,15 @@ cMessage* RmacNetworkLayer::decapsMsg( RmacControlMessage *msg ) {
 }
 
 
-/** @brief Encapsulate higher layer packet into a RmacControlMessage */
-NetwPkt* RmacNetworkLayer::encapsMsg( cPacket *appPkt ) {
+/** @brief Encapsulate higher layer packet into a ExtendedRmacControlMessage */
+NetwPkt* ExtendedRmacNetworkLayer::encapsMsg( cPacket *appPkt ) {
 
     LAddress::L2Type macAddr;
     LAddress::L3Type netwAddr;
 
     coreEV <<"in encaps...\n";
 
-    RmacControlMessage *pkt = new RmacControlMessage(appPkt->getName(), DATA);
+    ExtendedRmacControlMessage *pkt = new ExtendedRmacControlMessage(appPkt->getName(), DATA);
 
     pkt->setBitLength(headerLength);    // ordinary IP packet
 
@@ -782,7 +842,7 @@ NetwPkt* RmacNetworkLayer::encapsMsg( cPacket *appPkt ) {
  *
  * @return Returns true if the function needs to be called again, e.g. if a state change occurred.
  */
-bool RmacNetworkLayer::Process( cMessage *msg ) {
+bool ExtendedRmacNetworkLayer::Process( cMessage *msg ) {
 
 //    if ( msg && ( mProcessState == START || mProcessState == CLUSTERED ) )
 //        return false;     // We don't have timeouts for these.
@@ -813,8 +873,8 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 
 				} else {
 
-					// We have a set of one hop neighbours. Apply the NPA.
-					NPA predicate;
+					// We have a set of one hop neighbours. Apply the ExtendedNPA.
+					ExtendedNPA predicate;
 					predicate.mClient = this;
 					std::sort( mOneHopNeighbours.begin(), mOneHopNeighbours.end(), predicate );
 					//std::cerr << mId << ": Have " << mOneHopNeighbours.size() << " 1-hop neighbours. Entering JOIN phase.\n";
@@ -890,24 +950,56 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 			case UNIFYING:
 
 			    if ( msg == mPollTimeoutMessage ) {
-			    	// We haven't heard from the CH in a while.
-		    		//std::cerr << mId << ": POLL timeout, leaving " << mClusterHead << std::endl;
-		    		mClusterHierarchy.clear();
-		    		mNeighbours.erase(mClusterHead);
-		    		mClusterHead = -1;
-		    		if ( mCurrentState == CLUSTER_MEMBER ) {
-			    		if ( mProcessState == UNIFYING )
-			    			cancelEvent( mClusterUnifyTimeoutMessage );
-		    			// If we're a CM, we go to the unclustered state.
-			    		mCurrentState = UNCLUSTERED;
-			    		mProcessState = START;
-			    		returnValue = true;
-			    		emit( mSigHeadChange, 1 );
-			    	} else if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
-				    	// If we're a CHM, we go to the CH state.
-			    		mCurrentState = CLUSTER_HEAD;
-			    		// TODO: Propagate new hierarchy changes down.
-			    	}
+			    	// We haven't heard from the CH in a while. Let's check the connection with the CH.
+		    		// Increment the missed ping counter.
+		    		mNeighbours[mClusterHead].mMissedPings++;
+
+					bool routeDiverged = false, highLossProb = false, tooManyMisses = false;
+					
+					// First, check if we've crossed an intersection last we heard this guy.
+					if ( mNeighbours[mClusterHead].mTimeStamp <= dynamic_cast<CarMobility*>(mMobility)->getTOLIC() ) {
+						// We crossed an intersection since we last heard this node.
+						// If the route similarity was 1, then we've diverged from this node's path and we've lost it.
+						routeDiverged = ( mNeighbours[mClusterHead].mRouteSimilarity <= 1 );
+					}
+
+					// Check if the loss probability (scaled by missed ping count) is greater than the critical threshold.
+					highLossProb = ( mNeighbours[mClusterHead].mMissedPings*mNeighbours[mClusterHead].mLossProbability >= mCriticalLossProbability );
+
+					// Check if we've missed too many pings.
+					tooManyMisses = ( mNeighbours[mClusterHead].mMissedPings >= mMissedPingThreshold );
+
+					if ( routeDiverged || highLossProb || tooManyMisses ) {
+
+		    			// Our connection to the CH is considered dead.
+						//std::cerr << mId << ": POLL timeout, leaving " << mClusterHead << std::endl;
+						if ( mCurrentState == CLUSTER_MEMBER ) {
+							if ( mProcessState == UNIFYING )
+								cancelEvent( mClusterUnifyTimeoutMessage );
+							// If we're a CM, we go to the unclustered state.
+							//std::cerr << mId << ": Disconnected from CH " << mClusterHead << "; Probability = " << mNeighbours[mClusterHead].mLossProbability << " at distance " << mNeighbours[mClusterHead].mDistanceToNode << " with " << mNeighbours[mClusterHead].mMissedPings << " missed pings. " << ( routeDiverged ? "Diverged" : "" ) << "\n";
+							mCurrentState = UNCLUSTERED;
+							mProcessState = START;
+							returnValue = true;
+							emit( mSigHeadChange, 1 );
+							mReaffiliationCount++;
+						} else if ( mCurrentState == CLUSTER_HEAD_MEMBER ) {
+							// If we're a CHM, we go to the CH state.
+							mCurrentState = CLUSTER_HEAD;
+							// TODO: Propagate new hierarchy changes down.
+							//std::cerr << mId << ": Disconnected from CH " << mClusterHead << " and became CH of my own cluster.\n";
+						}
+						mClusterHead = -1;
+						mClusterHierarchy.clear();
+						mNeighbours.erase(mClusterHead);
+
+		    		} else {
+
+						// We are going to wait a little longer to make sure the CH is really dead.
+						scheduleAt( simTime()+mPollTimeout, mPollTimeoutMessage );
+
+					}
+
 			    } else if ( msg == mClusterUnifyTimeoutMessage ) {
 					mProcessState = CLUSTERED;
 					returnValue = true;
@@ -931,7 +1023,7 @@ bool RmacNetworkLayer::Process( cMessage *msg ) {
 /**
  * @brief Get the one-hop neighbours.
  */
-void RmacNetworkLayer::GetOneHopNeighbours() {
+void ExtendedRmacNetworkLayer::GetOneHopNeighbours() {
 
     mOneHopNeighbours.clear();
     if ( mNeighbours.empty() )
@@ -949,7 +1041,7 @@ void RmacNetworkLayer::GetOneHopNeighbours() {
 /**
  * @brief Determines whether a nearby cluster is disjoint or connected.
  */
-bool RmacNetworkLayer::EvaluateClusterPresence( RmacControlMessage *m ) {
+bool ExtendedRmacNetworkLayer::EvaluateClusterPresence( ExtendedRmacControlMessage *m ) {
 
 	// First let's check if the sending node is in our cluster.
 	if ( ListHasValue( mClusterMembers, m->getNodeId() ) )
@@ -979,7 +1071,7 @@ bool RmacNetworkLayer::EvaluateClusterPresence( RmacControlMessage *m ) {
 /**
  * @brief Send an control message
  */
-void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
+void ExtendedRmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
 
     LAddress::L2Type macAddr;
     LAddress::L3Type netwAddr;
@@ -989,7 +1081,7 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
     else
         netwAddr = mNeighbours[id].mNetworkAddress;
 
-    RmacControlMessage *pkt = new RmacControlMessage( "cluster-ctrl", type );
+    ExtendedRmacControlMessage *pkt = new ExtendedRmacControlMessage( "cluster-ctrl", type );
     int s = 360;
 
     coreEV << "sending RMAC ";
@@ -1128,6 +1220,8 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
     pkt->setClusterHead( mClusterHead );
     pkt->setConnectionCount( mClusterMembers.size() );
 
+    pkt->setNodeRoute( dynamic_cast<CarMobility*>(mMobility)->getRoute() );
+
     pkt->setSrcAddr(myNetwAddr);
     pkt->setDestAddr(netwAddr);
     coreEV << " netw "<< myNetwAddr << " sending packet" <<std::endl;
@@ -1158,7 +1252,7 @@ void RmacNetworkLayer::SendControlMessage( int type, int id, int role ) {
 /**
  * @brief Send an INQ broadcast.
  */
-void RmacNetworkLayer::SendInquiry() {
+void ExtendedRmacNetworkLayer::SendInquiry() {
     SendControlMessage( INQ_MESSAGE );
 }
 
@@ -1167,7 +1261,7 @@ void RmacNetworkLayer::SendInquiry() {
  * @brief Send a INQ_RESP unicast.
  * @param[in] id Identifier of the target node.
  */
-void RmacNetworkLayer::SendInquiryResponse( int id ) {
+void ExtendedRmacNetworkLayer::SendInquiryResponse( int id ) {
     SendControlMessage( INQ_RESPONSE_MESSAGE, id );
 }
 
@@ -1176,7 +1270,7 @@ void RmacNetworkLayer::SendInquiryResponse( int id ) {
  * @brief Send a JOIN request unicast.
  * @param[in] id Identifier of the target node.
  */
-void RmacNetworkLayer::SendJoinRequest( int id ) {
+void ExtendedRmacNetworkLayer::SendJoinRequest( int id ) {
     SendControlMessage( JOIN_MESSAGE, id );
 }
 
@@ -1185,7 +1279,7 @@ void RmacNetworkLayer::SendJoinRequest( int id ) {
  * @brief Send a JOIN response unicast.
  * @param[in] id Identifier of the target node.
  */
-void RmacNetworkLayer::SendJoinResponse( int id ) {
+void ExtendedRmacNetworkLayer::SendJoinResponse( int id ) {
     SendControlMessage( JOIN_RESPONSE_MESSAGE, id );
 }
 
@@ -1194,7 +1288,7 @@ void RmacNetworkLayer::SendJoinResponse( int id ) {
  * @brief Send a JOIN denial unicast.
  * @param[in] id Identifier of the target node.
  */
-void RmacNetworkLayer::SendJoinDenial( int id ) {
+void ExtendedRmacNetworkLayer::SendJoinDenial( int id ) {
     SendControlMessage( JOIN_DENIAL_MESSAGE, id );
 }
 
@@ -1202,7 +1296,7 @@ void RmacNetworkLayer::SendJoinDenial( int id ) {
 /**
  * @brief Send a POLL unicase to all CMs.
  */
-void RmacNetworkLayer::PollClusterMembers() {
+void ExtendedRmacNetworkLayer::PollClusterMembers() {
 	for ( NodeIdSet::iterator cmIt = mClusterMembers.begin();  cmIt != mClusterMembers.end(); cmIt++ ) {
 		SendControlMessage( POLL_MESSAGE, *cmIt );
 		mWaitingPollAcks.insert( *cmIt );
@@ -1215,7 +1309,7 @@ void RmacNetworkLayer::PollClusterMembers() {
 /**
  * @brief Respond to a POLL unicast.
  */
-void RmacNetworkLayer::AcknowledgePoll( int id ) {
+void ExtendedRmacNetworkLayer::AcknowledgePoll( int id ) {
 	SendControlMessage( POLL_ACK_MESSAGE, id );
 }
 
@@ -1223,7 +1317,7 @@ void RmacNetworkLayer::AcknowledgePoll( int id ) {
 /**
  * @brief Tell edge nodes to broadcast the cluster presence frame.
  */
-void RmacNetworkLayer::OrderClusterPresenceBroadcast() {
+void ExtendedRmacNetworkLayer::OrderClusterPresenceBroadcast() {
 
 	// CMs ARE NOT ALLOWED TO CALL THIS!
 	if ( mCurrentState == UNCLUSTERED || mCurrentState == CLUSTER_MEMBER )
@@ -1299,7 +1393,7 @@ void RmacNetworkLayer::OrderClusterPresenceBroadcast() {
 /**
  * @brief Broadcast the cluster presence frame.
  */
-void RmacNetworkLayer::BroadcastClusterPresence() {
+void ExtendedRmacNetworkLayer::BroadcastClusterPresence() {
 	SendControlMessage( CLUSTER_PRESENCE_MESSAGE );
 }
 
@@ -1308,7 +1402,7 @@ void RmacNetworkLayer::BroadcastClusterPresence() {
 /**
  * @brief Send a cluster unification request.
  */
-void RmacNetworkLayer::RequestClusterUnification( int id ) {
+void ExtendedRmacNetworkLayer::RequestClusterUnification( int id ) {
 	SendControlMessage( CLUSTER_UNIFY_REQUEST_MESSAGE, id );
 	if ( mClusterUnifyTimeoutMessage->isScheduled() )
 		cancelEvent( mClusterUnifyTimeoutMessage );
@@ -1320,7 +1414,7 @@ void RmacNetworkLayer::RequestClusterUnification( int id ) {
 /**
  * @brief Send a cluster unification response.
  */
-void RmacNetworkLayer::SendUnificationResponse( int id, int role ) {
+void ExtendedRmacNetworkLayer::SendUnificationResponse( int id, int role ) {
 	SendControlMessage( CLUSTER_UNIFY_RESPONSE_MESSAGE, id, role );
 }
 
@@ -1329,7 +1423,7 @@ void RmacNetworkLayer::SendUnificationResponse( int id, int role ) {
 /**
  * @brief Leave the cluster.
  */
-void RmacNetworkLayer::LeaveCluster() {
+void ExtendedRmacNetworkLayer::LeaveCluster() {
 
 	if ( mProcessState != CLUSTERED && mProcessState != UNIFYING && mCurrentState == CLUSTER_HEAD )
 		return;
@@ -1357,7 +1451,7 @@ void RmacNetworkLayer::LeaveCluster() {
  * @param[in] vel Velocity of the target node.
  * @return The time until the link expires.
  */
-double RmacNetworkLayer::CalculateLinkExpirationTime( Coord pos, Coord vel ) {
+double ExtendedRmacNetworkLayer::CalculateLinkExpirationTime( Coord pos, Coord vel ) {
 
     Coord p = mMobility->getCurrentPosition();
     Coord v = mMobility->getCurrentSpeed();
@@ -1374,9 +1468,71 @@ double RmacNetworkLayer::CalculateLinkExpirationTime( Coord pos, Coord vel ) {
 
 
 /**
+ * @brief Calculate the loss probability of a node.
+ * @param[in] a Parameter A of the channel's Rice distribution.
+ * @param[in] sigma Parameter Sigma of the channel's Rice distribution.
+ * @param[in] d Distance from the neighbour to this node.
+ * @return The probability that the last received message could have been lost.
+ */
+
+double ExtendedRmacNetworkLayer::CalculateLossProbability( double a, double sigma, double d ) {
+
+	// We need to obtain transmitter data. So get access to the scenario manager.
+	Urae::UraeData *urae = Urae::UraeData::GetSingleton();
+
+	double lambdaBy4PiSq = urae->GetLamdaBy4PiSq();
+	double rxSensitivity = urae->GetReceiverSensitivity();
+	double txPower = urae->GetTransmitPower();
+	double systemLoss = urae->GetSystemLoss();
+
+	// Now prepare some computations.
+	double arg1 = a / sigma;
+	double arg2 = ( rxSensitivity * d * d ) / ( txPower * lambdaBy4PiSq * sigma );
+
+	// Compute the loss probability from the Rice CDF, which is the Marcum Q function.
+//	std::cerr << mId << ": a = " << a << "; sigma = " << sigma << "; arg2 = " << arg2 << "; S = " << rxSensitivity << "; ";
+//	std::cerr << "d = " << d << "; txPower = " << txPower << "; l4p2 = " << lambdaBy4PiSq << "; ";
+	double prob = 1 - MarcumQ( arg1, arg2 );
+//	std::cerr << "prob = " << prob << "; K = " << a*a / (2*sigma*sigma) << "; O = " << a*a + (2*sigma*sigma) << "; d = " << d << "\n";
+	return ( prob != prob ? 0 : prob );
+
+}
+
+
+/**
+ * @brief Calculate the route similarity of a node.
+ * @param[in] r Route of the node.
+ * @return The number of consecutive route links this node has in common with ours.
+ */
+
+int ExtendedRmacNetworkLayer::CalculateRouteSimilarity( Route &r ) {
+
+	const Route& thisRoute = dynamic_cast<CarMobility*>(mMobility)->getRoute();
+    Route::iterator it1 = r.begin();
+    Route::const_iterator it2 = thisRoute.begin();
+    unsigned int minLen = std::min( r.size(), thisRoute.size() );
+
+    unsigned int similarity = 0;
+    for ( ; similarity < std::min( minLen, mRouteSimilarityThreshold ); similarity++ ) {
+
+    	if ( *it1 != *it2 )
+    		break;	// Reached a dissimilar route link, so bail out.
+
+    	// Increment the indices.
+    	it1++;
+    	it2++;
+
+    }
+
+    return similarity;
+
+}
+
+
+/**
  * Update neighbour data with the given message.
  */
-void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
+void ExtendedRmacNetworkLayer::UpdateNeighbour( ExtendedRmacControlMessage *m ) {
 
 	int id = m->getNodeId();
     mNeighbours[id].mId = id;
@@ -1394,6 +1550,17 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
     mNeighbours[id].mLinkExpirationTime = CalculateLinkExpirationTime( mNeighbours[id].mPosition, mNeighbours[id].mVelocity );
     mNeighbours[id].mTimeStamp = simTime();
     mNeighbours[id].mMissedPings = 0;
+
+    // Compute the route similarity of this node.
+    Route &r = m->getNodeRoute();
+    mNeighbours[id].mRouteSimilarity = CalculateRouteSimilarity(r);
+
+    // Compute the loss probability of this node.
+    UraeMacToNetwControlInfo *ctrlInfo = dynamic_cast<UraeMacToNetwControlInfo*>(m->getControlInfo());
+    mNeighbours[id].mLossProbability = CalculateLossProbability( ctrlInfo->getA(), ctrlInfo->getSigma(), mNeighbours[id].mDistanceToNode );
+
+//    std::cerr << mId << ": Similarity(" << id << ") = " << mNeighbours[id].mRouteSimilarity << "\n";
+
     mNeighbours[id].mDataOwner = this;
 
 	NeighbourEntrySet &pSet = m->getNeighbourTable();
@@ -1413,12 +1580,23 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
 		    mNeighbours[it->mId].mIsClusterHead = it->mIsClusterHead;
 		    mNeighbours[it->mId].mClusterHead = it->mClusterHead;
 			mNeighbours[it->mId].mConnectionCount = it->mConnectionCount;
-			mNeighbours[it->mId].mHopCount = it->mHopCount;
+			mNeighbours[it->mId].mHopCount = it->mHopCount+1;
 			mNeighbours[it->mId].mTimeStamp = it->mTimeStamp;
 			mNeighbours[it->mId].mMissedPings = it->mMissedPings;
 		    mNeighbours[it->mId].mProviderId = id;
 		    mNeighbours[it->mId].mDistanceToNode = mMobility->getCurrentPosition().distance( mNeighbours[it->mId].mPosition );
 		    mNeighbours[it->mId].mLinkExpirationTime = CalculateLinkExpirationTime( mNeighbours[it->mId].mPosition, mNeighbours[it->mId].mVelocity );
+
+		    /*
+		     *  About route similarity: The neighbour table does not contain a route of node i, but the similarity
+		     *  of the route with respect to the neighbour from which we received this table, Sni.
+		     *  It is thus not possible to work out the similarity with respect to us, Sui, but we can infer
+		     *  that there is at least some similarity. Thus the inference is that:
+		     *  Sui = min( Sni, Snu ) where Snu is the similarity between us and the node we got that data from.
+		     *  This is the minimum similarity that can be inferred.
+		     */
+		    mNeighbours[it->mId].mRouteSimilarity = std::min( mNeighbours[id].mRouteSimilarity, it->mRouteSimilarity );
+
 		    mNeighbours[it->mId].mDataOwner = this;
 
 		}
@@ -1430,19 +1608,24 @@ void RmacNetworkLayer::UpdateNeighbour( RmacControlMessage *m ) {
 
 
 
-
 /**
  * @brief Sorting predicate for the Node Precidence Algorithm.
  *
  * This implements the sorting mechanism for the Node Precidence Algorithm.
  */
-bool RmacNetworkLayer::NPA::operator()( const int &id1, const int &id2 ) {
+bool ExtendedRmacNetworkLayer::ExtendedNPA::operator()( const int &id1, const int &id2 ) {
 
 	const Neighbour &n = mClient->GetNeighbour( id1 );
 	const Neighbour &m = mClient->GetNeighbour( id2 );
 
+    // Does 'n' have higher route similarity than 'm'?
+    if ( n.mRouteSimilarity > m.mRouteSimilarity )
+        return true;    // 'n' has higher precidence.
+    else if ( n.mRouteSimilarity < m.mRouteSimilarity )
+    	return false;   // 'm' has higher precidence.
+
     // Has 'm' reached its maximum connection limits?
-    if ( m.mConnectionCount == n.mDataOwner->GetConnectionLimits() )
+    if ( m.mConnectionCount == m.mDataOwner->GetConnectionLimits() )
         return true;    // 'n' has higher precidence.
 
     // Has 'n' reached its maximum connection limits?
@@ -1470,6 +1653,7 @@ bool RmacNetworkLayer::NPA::operator()( const int &id1, const int &id2 ) {
             return false;   // 'm' has higher precidence.
     }
 
+
     // Does 'n' have a larger cluster than 'm'?
     if ( n.mConnectionCount > m.mConnectionCount )
         return true;    // 'n' has higher precidence.
@@ -1481,7 +1665,7 @@ bool RmacNetworkLayer::NPA::operator()( const int &id1, const int &id2 ) {
 
 
 
-void RmacNetworkLayer::UpdateLevelOfMember( int id, NodeIdList& record, bool eraseThis ) {
+void ExtendedRmacNetworkLayer::UpdateLevelOfMember( int id, NodeIdList& record, bool eraseThis ) {
 
 	if ( ListHasValue( record, mId ) )
 		return;	// CYCLICAL CLUSTER STRUCTURE!
@@ -1490,11 +1674,11 @@ void RmacNetworkLayer::UpdateLevelOfMember( int id, NodeIdList& record, bool era
 		return;
 
 	// Assess changes to hierarchy and propagate them.
-	RmacNetworkLayer *p;
+	ExtendedRmacNetworkLayer *p;
 	if ( eraseThis ) {
 		mLevelLookup.erase(id);
 	} else {
-		p = dynamic_cast<RmacNetworkLayer*>( cSimulation::getActiveSimulation()->getModule( id ) );
+		p = dynamic_cast<ExtendedRmacNetworkLayer*>( cSimulation::getActiveSimulation()->getModule( id ) );
 		mLevelLookup[id] = p->GetCurrentLevelCount();
 	}
 	mMaximumLevels = 0;
@@ -1506,7 +1690,7 @@ void RmacNetworkLayer::UpdateLevelOfMember( int id, NodeIdList& record, bool era
 	mCurrentLevels = std::max( mMaximumLevels, mCurrentLevels );
 
 	if ( mClusterHead != -1 ) {
-		p = dynamic_cast<RmacNetworkLayer*>( cSimulation::getActiveSimulation()->getModule( mClusterHead ) );
+		p = dynamic_cast<ExtendedRmacNetworkLayer*>( cSimulation::getActiveSimulation()->getModule( mClusterHead ) );
 		if ( p ) {
 			record.push_back(mId);
 			p->UpdateLevelOfMember( mId, record, false );
@@ -1518,6 +1702,28 @@ void RmacNetworkLayer::UpdateLevelOfMember( int id, NodeIdList& record, bool era
 
 
 
+/**
+ * @name StateChangeListener
+ * @brief Implementation of the StateChangeListener class.
+ **/
+/*@{*/
+
+void ExtendedRmacNetworkLayer::LaneChanged( int newLane ) {
+
+	// Nothing really.
+
+}
+
+
+void ExtendedRmacNetworkLayer::CrossedIntersection( std::string roadId ) {
+
+	// Go through all the neighbours and decrement the route similarity value.
+	for ( NeighbourIterator it = mNeighbours.begin(); it != mNeighbours.end(); it++ )
+		it->second.mRouteSimilarity -= ( it->second.mRouteSimilarity == 0 ? 0 : 1 );
+
+}
+
+/*@}*/
 
 
 

@@ -22,7 +22,7 @@ class AmacadNetworkLayer;
  * @brief Contains an entry in the AMACAD neighbour table.
  */
 struct NeighbourEntry {
-	unsigned int mID;                   /**< Identifier of the neighbour. */
+	unsigned int mId;                   /**< Identifier of the neighbour. */
 	LAddress::L3Type mNetworkAddress;   /**< The IP address of this neighbour. */
 	double mPositionX;					/**< X Position of this node. */
 	double mPositionY;					/**< Y Position of this node. */

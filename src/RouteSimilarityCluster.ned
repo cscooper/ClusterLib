@@ -13,34 +13,14 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-cplusplus {{
-#include "NetwPkt_m.h"
-
-typedef std::list<std::string> StringList;
-}}
-packet NetwPkt;
-
-class noncobject StringList;
+package clusterlib;
 
 //
-// Describes the M-DMAC cluster control message.
-// Extends the NetwPkt, so this can be used to encapsulate
-// application layer packets as well.
+// Implements the Route Similarity Function Clustering metric.
 //
-packet MdmacControlMessage extends NetwPkt {
-
-	int nodeId;
-	double weight;
-	bool isClusterHead;
-	double xPosition;
-	double yPosition;
-	double xVelocity;
-	double yVelocity;
-	string roadId;
-	string laneId;
-	double xDestination;
-	double yDestination;
-	StringList route;
-	int targetNodeId;	// ID of the CH I wish to join (used for JOIN_MESSAGE type)
-
+simple RouteSimilarityCluster extends MdmacNetworkLayer
+{
+    parameters:
+        @class(RouteSimilarityCluster);
+        int linkCount;
 }

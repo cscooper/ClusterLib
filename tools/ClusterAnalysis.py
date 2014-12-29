@@ -3,7 +3,8 @@
 from VectorMath import *
 from optparse import OptionParser
 from matplotlib import pyplot,lines
-import numpy, os, pickle, sys, time, itertools
+from matplotlib.colors import ColorConverter
+import numpy, os, pickle, sys, time, itertools, random
 from OmnetReader import DataContainer
 
 from matplotlib import rc
@@ -28,10 +29,11 @@ def DrawBarPlot( xAxis, yAxis, yErr, yLabel, xLabel, title, labelStrings ):
 	fig = pyplot.figure()
 	ax = fig.add_subplot(111)
 
-	cols = ['b','g','r','c','m','y','k','w']
-
 	rects = []
 	yN = len(yAxis)
+	#colconv = ColorConverter()
+	#cols = [ colconv.to_rgb((random.random(),random.random(),random.random())) for i in range(0,yN) ]
+	cols = ["b","g","r","c","m","y","k","w"]
 	for i in numpy.arange(yN):
 		rects.append( ax.bar( width*(ind*yN+i+ind), yAxis[i], width=width, color=cols[i], yerr=yErr[i], error_kw=dict(elinewidth=2,ecolor='black') ) )
 
@@ -51,9 +53,9 @@ metricPresentation = { "overhead" : "Overhead", "helloOverhead" : "Hello Overhea
 metricUnits = { "overhead" : "B", "helloOverhead" : "B", "clusterLifetime" : "s", "clusterSize" : None, "headChange" : None }
 metricMultiplier = { "overhead" : 1, "helloOverhead" : 1, "clusterLifetime" : 1 , "clusterSize" : 1, "headChange" : 1 }
 
-algorithmPresentation = { "HighestDegreeCluster" : "HD", "LowestIdCluster" : "LID", "LSUFCluster" : "LSUF", "RmacNetworkLayer" : "RMAC" }
-parameterAbbreviation = { "Node Density" : r"$\rho_N$", "Lane Count" : "$N_L$", "Junction Count" : "$N_J$", "Speed" : "$S_{max}$" }
-parameterUnits = { "Speed" : "km/h", }
+algorithmPresentation = { "HighestDegreeCluster" : "HD", "LowestIdCluster" : "LID", "LSUFCluster" : "LSUF", "RmacNetworkLayer" : "RMAC", "AmacadNetworkLayer" : "AMACAD", "ExtendedRmacNetworkLayer" : "E-RMAC" }
+parameterAbbreviation = { "Node Density" : r"$\rho_N$", "Lane Count" : "$N_L$", "Junction Count" : "$N_J$", "Speed" : "$S_{max}$", "CBD Count" : "$N_{CBD}$", "Car Density" : r"$\rho_N$", "Time Threshold" : "$T_{TH}$", "Distance Threshold" : "$D_{TH}$", "Speed Threshold" : "$S_{TH}$", "Maximum Warning" : "$W_{max}$", "Destination Weight" : "$w_{D}$", "Time To Live" : "$TTL$", "Route Similarity Threshold" : "$S_{TH}$", "Critical Loss" : "$P_{crit}$" }
+parameterUnits = { "Speed" : "km/h", "Speed Threshold" : "km/h", "Time Threshold" : "s", "Distance Threshold" : "m", "Time To Live" : "s" }
 
 ##################
 # DATA COMPILING #
@@ -243,10 +245,12 @@ class MDMACColator:
 								continue
 							try:
 								metricMean, metricStd = PoolMeanVar( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][0], resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][1], resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][3] )
-								metricRate = numpy.sum( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2] ) / ( 1100 * resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5] )
+								metricRateMean = numpy.sum( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2] / 1100 ) / ( 1100 * resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5] )
+								metricRateVar = numpy.sum( numpy.power( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2], 2 ) / numpy.power(1100,2) - metricRateMean*metricRateMean ) / resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5]
+#								metricRate = numpy.sum( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2] ) / ( 1100 * resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5] )
 								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Mean " + metric] = (metricMean, metricStd)
 								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Total " + metric] = (numpy.sum( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][2] )/resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][5], 0)
-								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric+ " Rate"] = (metricRate,0)
+								resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric+ " Rate"] = (metricRateMean,metricRateVar)
 								if len(resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][4]) != 0:
 									resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount]["Maximum "+metric] = ( numpy.max( resultSet[beaconInterval][initialFreshness][freshnessThreshold][hopCount][metric][4] ), 0 )
 							except Exception as e:
@@ -264,7 +268,7 @@ class MDMACColator:
 class RMACColator:
 
 	def __init__(self):
-		self.precidence = ['Missed Pings']
+		self.precidence = ['Missed Pings', 'Distance Threshold', 'Time Threshold']
 
 	def GatherResults( self, unsortedResults, runAttributes, retRes ):
 		# Add them to the set
@@ -274,48 +278,212 @@ class RMACColator:
 			if missedPings not in retRes:
 				retRes[missedPings] = {}
 
+			distThresh = runAttributes['distThresh']
+			if distThresh not in retRes[missedPings]:
+				retRes[missedPings][distThresh] = {}
+
+			timeThresh = runAttributes['timeThresh']
+			if timeThresh not in retRes[missedPings][distThresh]:
+				retRes[missedPings][distThresh][timeThresh] = {}
+
 			# If this metric has not been added to this configuration, add it.
-			if metricPresentation[metric] not in retRes[missedPings]:
-				retRes[missedPings][metricPresentation[metric]] = [ unsortedResults[0][metric], unsortedResults[1][metric], unsortedResults[2][metric], unsortedResults[3][metric], unsortedResults[4][metric], 1 ]
-				retRes[missedPings]["Mean "+metricPresentation[metric]] = 0
-				retRes[missedPings]["Total "+metricPresentation[metric]] = 0
-				retRes[missedPings]["Maximum "+metricPresentation[metric]] = 0
-				retRes[missedPings][metricPresentation[metric]+" Rate"] = 0
+			if metricPresentation[metric] not in retRes[missedPings][distThresh][timeThresh]:
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]] = [ unsortedResults[0][metric], unsortedResults[1][metric], unsortedResults[2][metric], unsortedResults[3][metric], unsortedResults[4][metric], 1 ]
+				retRes[missedPings][distThresh][timeThresh]["Mean "+metricPresentation[metric]] = 0
+				retRes[missedPings][distThresh][timeThresh]["Total "+metricPresentation[metric]] = 0
+				retRes[missedPings][distThresh][timeThresh]["Maximum "+metricPresentation[metric]] = 0
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]+" Rate"] = 0
 			else:
 				# Append the result to the list of metrics
-				retRes[missedPings][metricPresentation[metric]][0] += unsortedResults[0][metric]
-				retRes[missedPings][metricPresentation[metric]][1] += unsortedResults[1][metric]
-				retRes[missedPings][metricPresentation[metric]][2] += unsortedResults[2][metric]
-				retRes[missedPings][metricPresentation[metric]][3] += unsortedResults[3][metric]
-				retRes[missedPings][metricPresentation[metric]][4] += unsortedResults[4][metric]
-				retRes[missedPings][metricPresentation[metric]][5] += 1
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]][0] += unsortedResults[0][metric]
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]][1] += unsortedResults[1][metric]
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]][2] += unsortedResults[2][metric]
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]][3] += unsortedResults[3][metric]
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]][4] += unsortedResults[4][metric]
+				retRes[missedPings][distThresh][timeThresh][metricPresentation[metric]][5] += 1
 
 	def GetStatistics( self, resultSet ):
 		removeResults = []
 		for missedPings in resultSet:
-			for metric in resultSet[missedPings]:
-				if "Mean" in metric or "Rate" in metric or "Total" in metric or "Maximum" in metric:
-					continue
-				removeResults.append( [missedPings,metric] )
-				if len( resultSet[missedPings][metric] ) == 0:
-					continue
-				try:
-					metricMean, metricStd = PoolMeanVar( resultSet[missedPings][metric][0], resultSet[missedPings][metric][1], resultSet[missedPings][metric][3] )
-					metricRate = numpy.sum( resultSet[missedPings][metric][2] ) / ( 1100 * resultSet[missedPings][metric][5] )
-					resultSet[missedPings]["Mean " + metric] = (metricMean, metricStd)
-					resultSet[missedPings]["Total " + metric] = (numpy.sum( resultSet[missedPings][metric][2] )/resultSet[missedPings][metric][5], 0)
-					resultSet[missedPings][metric+ " Rate"] = (metricRate,0)
-					if len(resultSet[missedPings][metric][4]) != 0:
-						resultSet[missedPings]["Maximum "+metric] = ( numpy.max( resultSet[missedPings][metric][4] ), 0 )
-				except Exception as e:
-					print "Problem obtaining statistics for '" + metric + "'"
-					print "Missed pings =", missedPings
-					raise e
+			for distThresh in resultSet[missedPings]:
+				for timeThresh in resultSet[missedPings][distThresh]:
+					for metric in resultSet[missedPings][distThresh][timeThresh]:
+						if "Mean" in metric or "Rate" in metric or "Total" in metric or "Maximum" in metric:
+							continue
+						removeResults.append( [missedPings,distThresh,timeThresh,metric] )
+						if len( resultSet[missedPings][distThresh][timeThresh][metric] ) == 0:
+							continue
+						try:
+							metricMean, metricStd = PoolMeanVar( resultSet[missedPings][distThresh][timeThresh][metric][0], resultSet[missedPings][distThresh][timeThresh][metric][1], resultSet[missedPings][distThresh][timeThresh][metric][3] )
+							metricRateMean = numpy.sum( resultSet[missedPings][distThresh][timeThresh][metric][2] ) / ( 1100 * resultSet[missedPings][distThresh][timeThresh][metric][5] )
+							metricRateVar = numpy.sum( numpy.power( resultSet[missedPings][distThresh][timeThresh][metric][2], 2 ) / numpy.power(1100,2) - metricRateMean*metricRateMean ) / resultSet[missedPings][distThresh][timeThresh][metric][5]
+#							metricRate = numpy.sum( resultSet[missedPings][distThresh][timeThresh][metric][2] ) / ( 1100 * resultSet[missedPings][distThresh][timeThresh][metric][5] )
+							resultSet[missedPings][distThresh][timeThresh]["Mean " + metric] = (metricMean, metricStd)
+							resultSet[missedPings][distThresh][timeThresh]["Total " + metric] = (numpy.sum( resultSet[missedPings][distThresh][timeThresh][metric][2] )/resultSet[missedPings][distThresh][timeThresh][metric][5], 0)
+							resultSet[missedPings][distThresh][timeThresh][metric+ " Rate"] = (metricRateMean,metricRateVar)
+							if len(resultSet[missedPings][distThresh][timeThresh][metric][4]) != 0:
+								resultSet[missedPings][distThresh][timeThresh]["Maximum "+metric] = ( numpy.max( resultSet[missedPings][distThresh][timeThresh][metric][4] ), 0 )
+						except Exception as e:
+							print "Problem obtaining statistics for '" + metric + "'"
+							print "Missed pings =", missedPings
+							raise e
 		for r in removeResults:
-			del resultSet[r[0]][r[1]]
+			del resultSet[r[0]][r[1]][r[2]][r[3]]
 
 
-Colators = { "HighestDegreeCluster" : MDMACColator, "LowestIdCluster" : MDMACColator, "LSUFCluster" : MDMACColator, "RmacNetworkLayer" : RMACColator }
+
+
+
+
+
+class AMACADColator:
+
+	def __init__(self):
+		self.precidence = ['Maximum Warning','Speed Threshold','Time To Live','Destination Weight']
+
+	def GatherResults( self, unsortedResults, runAttributes, retRes ):
+		# Add them to the set
+		for metric in unsortedResults[0]:
+
+			maxWarning = runAttributes['maxWarning']
+			if maxWarning not in retRes:
+				retRes[maxWarning] = {}
+
+			speedThresh = runAttributes['speedThresh']
+			if speedThresh not in retRes[maxWarning]:
+				retRes[maxWarning][speedThresh] = {}
+
+			ttl = runAttributes['ttl']
+			if ttl not in retRes[maxWarning][speedThresh]:
+				retRes[maxWarning][speedThresh][ttl] = {}
+
+			destWeight = runAttributes['destWeight']
+			if destWeight not in retRes[maxWarning][speedThresh][ttl]:
+				retRes[maxWarning][speedThresh][ttl][destWeight] = {}
+
+			# If this metric has not been added to this configuration, add it.
+			if metricPresentation[metric] not in retRes[maxWarning][speedThresh][ttl][destWeight]:
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]] = [ unsortedResults[0][metric], unsortedResults[1][metric], unsortedResults[2][metric], unsortedResults[3][metric], unsortedResults[4][metric], 1 ]
+				retRes[maxWarning][speedThresh][ttl][destWeight]["Mean "+metricPresentation[metric]] = 0
+				retRes[maxWarning][speedThresh][ttl][destWeight]["Total "+metricPresentation[metric]] = 0
+				retRes[maxWarning][speedThresh][ttl][destWeight]["Maximum "+metricPresentation[metric]] = 0
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]+" Rate"] = 0
+			else:
+				# Append the result to the list of metrics
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]][0] += unsortedResults[0][metric]
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]][1] += unsortedResults[1][metric]
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]][2] += unsortedResults[2][metric]
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]][3] += unsortedResults[3][metric]
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]][4] += unsortedResults[4][metric]
+				retRes[maxWarning][speedThresh][ttl][destWeight][metricPresentation[metric]][5] += 1
+
+	def GetStatistics( self, resultSet ):
+		removeResults = []
+		for maxWarning in resultSet:
+			for speedThresh in resultSet[maxWarning]:
+				for ttl in resultSet[maxWarning][speedThresh]:
+					for destWeight in resultSet[maxWarning][speedThresh][ttl]:
+						for metric in resultSet[maxWarning][speedThresh][ttl][destWeight]:
+							if "Mean" in metric or "Rate" in metric or "Total" in metric or "Maximum" in metric:
+								continue
+							removeResults.append( [maxWarning,speedThresh,ttl,destWeight,metric] )
+							if len( resultSet[maxWarning][speedThresh][ttl][destWeight][metric] ) == 0:
+								continue
+							try:
+								metricMean, metricStd = PoolMeanVar( resultSet[maxWarning][speedThresh][ttl][destWeight][metric][0], resultSet[maxWarning][speedThresh][ttl][destWeight][metric][1], resultSet[maxWarning][speedThresh][ttl][destWeight][metric][3] )
+								metricRateMean = numpy.sum( resultSet[maxWarning][speedThresh][ttl][destWeight][metric][2] ) / ( 1100 * resultSet[maxWarning][speedThresh][ttl][destWeight][metric][5] )
+								metricRateVar = numpy.sum( numpy.power( resultSet[maxWarning][speedThresh][ttl][destWeight][metric][2], 2 ) / numpy.power(1100,2) - metricRateMean*metricRateMean ) / resultSet[maxWarning][speedThresh][ttl][destWeight][metric][5]
+#								metricRate = numpy.sum( resultSet[maxWarning][speedThresh][ttl][destWeight][metric][2] ) / ( 1100 * resultSet[maxWarning][speedThresh][ttl][destWeight][metric][5] )
+								resultSet[maxWarning][speedThresh][ttl][destWeight]["Mean " + metric] = (metricMean, metricStd)
+								resultSet[maxWarning][speedThresh][ttl][destWeight]["Total " + metric] = (numpy.sum( resultSet[maxWarning][speedThresh][ttl][destWeight][metric][2] )/resultSet[maxWarning][speedThresh][ttl][destWeight][metric][5], 0)
+								resultSet[maxWarning][speedThresh][ttl][destWeight][metric+ " Rate"] = (metricRateMean,metricRateVar)
+								if len(resultSet[maxWarning][speedThresh][ttl][destWeight][metric][4]) != 0:
+									resultSet[maxWarning][speedThresh][ttl][destWeight]["Maximum "+metric] = ( numpy.max( resultSet[maxWarning][speedThresh][ttl][destWeight][metric][4] ), 0 )
+							except Exception as e:
+								print "Problem obtaining statistics for '" + metric + "'"
+								raise e
+		for r in removeResults:
+			del resultSet[r[0]][r[1]][r[2]][r[3]][r[4]]
+
+
+
+
+
+
+class ExtendedRMACColator:
+
+	def __init__(self):
+		self.precidence = ['Critical Loss', 'Distance Threshold', 'Time Threshold', 'Route Similarity Threshold']
+
+	def GatherResults( self, unsortedResults, runAttributes, retRes ):
+		# Add them to the set
+		for metric in unsortedResults[0]:
+
+			criticalLoss = runAttributes['criticalLoss']
+			if criticalLoss not in retRes:
+				retRes[criticalLoss] = {}
+
+			distThresh = runAttributes['distThresh']
+			if distThresh not in retRes[criticalLoss]:
+				retRes[criticalLoss][distThresh] = {}
+
+			timeThresh = runAttributes['timeThresh']
+			if timeThresh not in retRes[criticalLoss][distThresh]:
+				retRes[criticalLoss][distThresh][timeThresh] = {}
+
+			routeSimilarity = runAttributes['routeSimilarity']
+			if routeSimilarity not in retRes[criticalLoss][distThresh][timeThresh]:
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity] = {}
+
+			# If this metric has not been added to this configuration, add it.
+			if metricPresentation[metric] not in retRes[criticalLoss][distThresh][timeThresh][routeSimilarity]:
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]] = [ unsortedResults[0][metric], unsortedResults[1][metric], unsortedResults[2][metric], unsortedResults[3][metric], unsortedResults[4][metric], 1 ]
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity]["Mean "+metricPresentation[metric]] = 0
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity]["Total "+metricPresentation[metric]] = 0
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity]["Maximum "+metricPresentation[metric]] = 0
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]+" Rate"] = 0
+			else:
+				# Append the result to the list of metrics
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]][0] += unsortedResults[0][metric]
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]][1] += unsortedResults[1][metric]
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]][2] += unsortedResults[2][metric]
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]][3] += unsortedResults[3][metric]
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]][4] += unsortedResults[4][metric]
+				retRes[criticalLoss][distThresh][timeThresh][routeSimilarity][metricPresentation[metric]][5] += 1
+
+	def GetStatistics( self, resultSet ):
+		removeResults = []
+		for criticalLoss in resultSet:
+			for distThresh in resultSet[criticalLoss]:
+				for timeThresh in resultSet[criticalLoss][distThresh]:
+					for routeSimilarity in resultSet[criticalLoss][distThresh][timeThresh]:
+						for metric in resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity]:
+							if "Mean" in metric or "Rate" in metric or "Total" in metric or "Maximum" in metric:
+								continue
+							removeResults.append( [criticalLoss,distThresh,timeThresh,routeSimilarity,metric] )
+							if len( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric] ) == 0:
+								continue
+							try:
+								metricMean, metricStd = PoolMeanVar( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][0], resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][1], resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][3] )
+								metricRateMean = numpy.sum( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][2] ) / ( 1100 * resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][5] )
+								metricRateVar = numpy.sum( numpy.power( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][2], 2 ) / numpy.power(1100,2) - metricRateMean*metricRateMean ) / resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][5]
+#								metricRate = numpy.sum( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][2] ) / ( 1100 * resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][5] )
+								resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity]["Mean " + metric] = (metricMean, metricStd)
+								resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity]["Total " + metric] = (numpy.sum( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][2] )/resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][5], 0)
+								resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric+ " Rate"] = (metricRateMean,metricRateVar)
+								if len(resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][4]) != 0:
+									resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity]["Maximum "+metric] = ( numpy.max( resultSet[criticalLoss][distThresh][timeThresh][routeSimilarity][metric][4] ), 0 )
+							except Exception as e:
+								print "Problem obtaining statistics for '" + metric + "'"
+								raise e
+		for r in removeResults:
+			del resultSet[r[0]][r[1]][r[2]][r[3]][r[4]]
+
+
+
+
+
+Colators = { "HighestDegreeCluster" : MDMACColator, "LowestIdCluster" : MDMACColator, "LSUFCluster" : MDMACColator, "RmacNetworkLayer" : RMACColator, "AmacadNetworkLayer" : AMACADColator, "AmacadWeightCluster" : AMACADColator, "ExtendedRmacNetworkLayer" : ExtendedRMACColator }
 
 
 
@@ -357,18 +525,23 @@ def dataCompile( argv ):
 
 			# Get the parameters of this run
 			runAttributes = dataContainers[config].getRunAttributes()
-			channelModel = runAttributes['channelModel']
-			algorithm = runAttributes['networkType']
-			print "Process " + options.process
-			if options.process == 'grid':
-				pass
-			elif options.process == 'highway':
-				laneCount = int(runAttributes['laneCount'])
-				junctionCount = int(runAttributes['junctionCount'])
-				speed = float(runAttributes['speed'])
-				carDensity = float(runAttributes['cars'])
-			elif options.process == 'location':
-				location = runAttributes['launchCfg'].lstrip('xmldoc(\\"maps').rstrip('.launchd.xml\\")').lstrip('/')
+			try:
+				channelModel = runAttributes['channelModel']
+				algorithm = runAttributes['networkType']
+				#print "Process " + options.process
+				if options.process == 'grid':
+					carDensity = float(runAttributes['cars'])
+					cbdCount = float(runAttributes['cbds'])
+				elif options.process == 'highway':
+					laneCount = int(runAttributes['laneCount'])
+					junctionCount = int(runAttributes['junctionCount'])
+					speed = float(runAttributes['speed'])
+					carDensity = float(runAttributes['cars'])
+				elif options.process == 'location':
+					location = runAttributes['launchCfg'].lstrip('xmldoc(\\"maps').rstrip('.launchd.xml\\")').lstrip('/')
+			except KeyError as e:
+				print "Run #" + str(run) + " is missing run attributes. Skipping. (Error: " + str(e) + ")"
+				continue
 
 			# Collect the results for this run.
 			results = collectResults( dataContainers[config] )
@@ -379,13 +552,19 @@ def dataCompile( argv ):
 			if options.process == 'grid':
 				# The location data is specified by the lane count and the road length.
 
-				if channelModel not in resultSet:
-					resultSet[channelModel] = {}
+				if cbdCount not in resultSet:
+					resultSet[cbdCount] = {}
 
-				if algorithm not in resultSet[channelModel]:
-					resultSet[channelModel][algorithm] = {}
+				if carDensity not in resultSet[cbdCount]:
+					resultSet[cbdCount][carDensity] = {}
 
-				colator.GatherResults( results, runAttributes, resultSet[channelModel][algorithm] )
+				if channelModel not in resultSet[cbdCount][carDensity]:
+					resultSet[cbdCount][carDensity][channelModel] = {}
+
+				if algorithm not in resultSet[cbdCount][carDensity][channelModel]:
+					resultSet[cbdCount][carDensity][channelModel][algorithm] = {}
+
+				colator.GatherResults( results, runAttributes, resultSet[cbdCount][carDensity][channelModel][algorithm] )
 
 			elif options.process == 'highway':
 				# The location data is specified by the lane count, the road length, speed, and node density.
@@ -427,9 +606,11 @@ def dataCompile( argv ):
 
 		# We've collected all the results, now we need to compute their means and stddevs
 		if options.process == 'grid':
-			for channelModel in resultSet:
-				for algorithm in resultSet[channelModel]:
-					colator.GetStatistics( resultSet[channelModel][algorithm] )
+			for cbdCount in resultSet:
+				for carDensity in resultSet[cbdCount]:
+					for channelModel in resultSet[cbdCount][carDensity]:
+						for algorithm in resultSet[cbdCount][carDensity][channelModel]:
+							colator.GetStatistics( resultSet[cbdCount][carDensity][channelModel][algorithm] )
 
 		elif options.process == 'highway':
 			for laneCount in resultSet:
@@ -449,12 +630,13 @@ def dataCompile( argv ):
 	resultSet['settings'] = {}
 	resultSet['settings']['process'] = options.process
 	if options.process == 'grid':
-		resultSet['settings']['precidence'] = ['Channel Model','Algorithm']
+		resultSet['settings']['precidence'] = ['CBD Count','Car Density','Channel Model','Algorithm']
 	elif options.process == 'highway':
 		resultSet['settings']['precidence'] = ['Lane Count','Junction Count','Speed','Node Density','Channel Model','Algorithm']
 	elif options.process == 'location':
 		resultSet['settings']['precidence'] = ['Location','Channel Model','Algorithm']
 
+	resultSet['settings']['precidence'] += colator.precidence
 
 	# We've collated all the results. Attempt to dump this to a file.
 	with open(options.outputFile,"w") as f:
@@ -762,6 +944,18 @@ def gridAnalyse(resultData):
 			pyplot.show()
 
 
+def isNumber(s):
+	try:
+		float(s)
+		return True
+	except ValueError:
+		return False
+	return False
+
+def convertIfNumeric(s):
+	if isNumber(s):
+		return float(s)
+	return s
 
 def highwayAnalyse(resultData):
 	if 'settings' in resultData.keys():
@@ -773,7 +967,7 @@ def highwayAnalyse(resultData):
 		if loc > len(precidence)+1:
 			return None
 		if level == loc:
-			return sorted(dat.keys())
+			return sorted(dat.keys(),key=convertIfNumeric)
 		return obtainKeys( dat[kwargs[precidence[level]]], loc, level+1, precidence, **kwargs )
 
 	def obtainMetrics( dat, val, loc, level, precidence, **kwargs ):
@@ -804,13 +998,19 @@ def highwayAnalyse(resultData):
 		xAxis = None
 		currVals = resultData
 		for n in precidence:
-			res[n] = doSelection( 'Select a ' + n + ':', sorted(currVals.keys()) + ['Use as axis'] )
+			if len(currVals) == 1:
+				print "Only one value of " + n + "; Selecting '" + n + "' = " + str(currVals.keys()[0])
+				res[n] = [currVals.keys()[0]]
+				currVals = currVals[res[n][0]]
+				continue
+
+			res[n] = doSelection( 'Select a ' + n + ':', sorted(currVals.keys(),key=convertIfNumeric) + ['Use as axis'] )
 			if not res[n]:
 				endThis = True
 				break
 			nextN = res[n][0]
 			if nextN == 'Use as axis':
-				res[n] = sorted(currVals.keys())
+				res[n] = sorted(currVals.keys(),key=convertIfNumeric)
 			nextN = res[n][0]
 			if len(res[n]) > 1:
 				setAxes.append(n)
@@ -838,7 +1038,7 @@ def highwayAnalyse(resultData):
 
 			markerIndex = 0
 
-			if plotType == "column":
+			if plotType == "column" or plotType == "export":
 				hAxis = []
 				yAxis = []
 				yErr = []
@@ -866,14 +1066,17 @@ def highwayAnalyse(resultData):
 						units = ""
 						if k in parameterUnits:
 							units = parameterUnits[k]
-						labelStr += paramName + "=" + str(kw[k]) + units
+						if paramName == "Algorithm":
+							labelStr += algorithmPresentation[kw[k]]
+						else:
+							labelStr += paramName + "=" + str(kw[k]) + units
 						s = True
 
 				v = [val[0] for val in vVals]
 				verr = numpy.sqrt( [val[1] for val in vVals] ) / 2
 				yMax = max( yMax, max( [ v[i]+verr[i] for i in range(0,len(v)) ] ) )
 
-				if plotType == "column":
+				if plotType == "column" or plotType == "export":
 					hAxis = hVals
 					yAxis.append( v )
 					yErr.append( verr )
@@ -894,6 +1097,19 @@ def highwayAnalyse(resultData):
 				pyplot.ylabel( metrics[0] )
 				pyplot.ylim(0,yMax+0.5)
 				pyplot.grid( None, axis='y')
+			elif plotType == "export":
+				filename = metrics[0] + " vs. " + xAxis + ".dat"
+				with open(filename,"w") as f:
+					# Write the label strings
+					f.write("Labels: "+",".join(labelStrings)+"\n")
+					# Write the axis names
+					f.write("xAxis: "+xAxis+"\n")
+					f.write("yAxis: "+metrics[0]+"\n")
+					# Write the data
+					f.write("x: "+",".join([str(a) for a in hAxis])+"\n")
+					for i in range(0,len(yAxis)):
+						f.write("y"+str(i)+": "+",".join([str(a) for a in yAxis[i]])+"\n")
+						f.write("yerr"+str(i)+": "+",".join([str(a) for a in yErr[i]])+"\n")
 
 			pyplot.show()
 

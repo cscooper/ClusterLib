@@ -78,7 +78,7 @@ protected:
 
 	struct Neighbour {
 
-		int mID;							/**< ID of the node. */
+		int mId;							/**< ID of the node. */
         LAddress::L3Type mNetworkAddress;   /**< The IP address of this neighbour. */
 		Coord mPosition;					/**< Position of this node. */
 		double mSpeed;						/**< Speed of the node. */
@@ -98,7 +98,7 @@ protected:
 
 	bool mInitialised;
 
-	int mID;							/**< ID of this node. */
+	//int mId;							/**< ID of this node. */
 	bool mIsClusterHead;				/**< Is this node a CH? */
 	NeighbourSet mNeighbours;			/**< This node's neighbour table. */
 	ClusterState mCurrentState;			/**< State of the algorithm. */
@@ -111,6 +111,8 @@ protected:
 
 	double mLastSpeed;					/**< Last speed we calculated between our neighbours. */
 	double mLastBandwidth;				/**< Last bandwidth we calculated between our neighbours. */
+
+	int mCurrentClusterHeadTarget;		/**< The CH we're currently trying to affiliate with. */
 
     /**
      * @name Handlers
@@ -168,7 +170,7 @@ protected:
     /**
      * Calculate the F value.
      */
-    double CalculateF( int id=-1, bool combined = false );
+    double CalculateF( int id=-1 );
 
 
     /**

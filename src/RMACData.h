@@ -33,6 +33,7 @@ struct NeighbourEntry {
 	unsigned int mConnectionCount;      /**< Number of connections this node now has. */
 	unsigned int mHopCount;             /**< Number of hops this neighbour is from this node. */
 	unsigned int mMissedPings;			/**< Number of times this node has missed a ping. */
+	unsigned int mRouteSimilarity;		/**< How similar is this neighbour's route to ours? */
 	simtime_t mTimeStamp;				/**< Timestamp of this data. */
 };
 
@@ -41,5 +42,7 @@ typedef NeighbourEntrySet::iterator NeighbourEntrySetIterator;
 
 typedef std::vector<unsigned int> NeighbourIdSet;
 typedef NeighbourIdSet::iterator NeighbourIdSetIterator;
+
+typedef std::list<std::string> Route;
 
 #endif /* #define RMACDATA_H_ */

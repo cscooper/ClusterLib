@@ -24,7 +24,8 @@ public:
 	 */
 	enum ClusterDeath {
 		CD_Attrition = 0,
-		CD_Cannibal
+		CD_Cannibal,
+		CD_Suicide
 	};
 
 	ClusterAlgorithm();
@@ -108,6 +109,7 @@ public:
 	/*@}*/
 
 protected:
+    unsigned int mId;				/**< ID of the node. */
     int mClusterHead;               /**< ID of the CH we're associated with (initialised to -1). */
     NodeIdSet mClusterMembers;      /**< Set of CMs associated with this node (if it is a CH) */
     BaseMobility *mMobility;		/**< Mobility module for this node. */
