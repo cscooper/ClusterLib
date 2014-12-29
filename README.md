@@ -4,21 +4,30 @@ ClusterLib
 Implementations of a selection of clustering algorithms for VANETs, written in C++ for OMNeT++
 
 Supported clustering algorithms:
+
     - Modified Distributed Mobility-Aware Clustering (MDMAC), by Wolny et al.
       Class name: MdmacNetworkLayer
+
     - Adaptive Mobility-Aware Clustering Algorithm with Destination (AMACAD), by Morales et al.
       Class name: AmacadNetworkLayer
+
     - Robust Mobility Adaptive Clustering (RMAC), by Goonewardene et al.
       Class name: RmacNetworkLayer
+
     - Channel and Route Aware Clustering (CRAC), by Cooper et al.
       Class name: ExtendedRmacNetworkLayer
 
 MDMAC also implements a number of clustering metrics:
+
     - Lowest ID; Class name: LowestIdCluster
+
     - Highest Degree; Class name: HighestDegreeCluster
+
     - Lane-Sense Utility Function, by Almalag et al.; Class name: LSUFCluster
+
     - Route Similarity, which counts the consecutive common route links between two nodes, by Cooper et al
       Class name: RouteSimilarityCluster
+
     - Destination Analysis, similar to AMACAD's weight; Class name: AmacadWeightCluster
 
 To compile these you need OMNeT++ 4.2 or later (http://omnetpp.org/), VEINS 2.0 (http://veins.car2x.org/), and Urban Radio Channel (https://github.com/cscooper/URC).
